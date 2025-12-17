@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "username": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 50
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["id", "username", "email", "created_at"],
+  "additionalProperties": false
+}

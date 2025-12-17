@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["premium", "basic"]
+    },
+    "price": {
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "required": ["type", "price"],
+  "if": {
+    "properties": {
+      "type": {
+        "const": "premium"
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "price": {
+        "minimum": 100
+      }
+    }
+  },
+  "else": {
+    "properties": {
+      "price": {
+        "maximum": 50
+      }
+    }
+  }
+}

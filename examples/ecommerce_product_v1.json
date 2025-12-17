@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "price": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMinimum": true
+    },
+    "currency": {
+      "type": "string",
+      "enum": ["USD", "EUR", "GBP"]
+    },
+    "category": {
+      "type": "string"
+    },
+    "in_stock": {
+      "type": "boolean"
+    }
+  },
+  "required": ["id", "name", "price", "currency", "in_stock"],
+  "additionalProperties": false
+}

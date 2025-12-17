@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "body": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string",
+      "enum": ["open", "closed"]
+    },
+    "assignee": {
+      "type": ["string", "null"]
+    }
+  },
+  "required": ["id", "title", "state"]
+}

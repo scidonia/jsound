@@ -59,7 +59,9 @@ class SchemaCompiler:
                 constraints.append(self.compile_not(json_var, schema["not"]))
 
             # Handle string constraints
-            if any(k in schema for k in ["minLength", "maxLength", "pattern"]):
+            if any(
+                k in schema for k in ["minLength", "maxLength", "pattern", "format"]
+            ):
                 constraints.append(self.compile_string_constraints(json_var, schema))
 
             # Handle object constraints
@@ -84,6 +86,12 @@ class SchemaCompiler:
                 ]
             ):
                 constraints.append(self.compile_number_constraints(json_var, schema))
+
+            # Handle if/then/else conditionals
+            if any(k in schema for k in ["if", "then", "else"]):
+                constraints.append(
+                    self.compile_conditional_constraints(json_var, schema)
+                )
 
             # Combine all constraints
             if not constraints:
@@ -199,6 +207,19 @@ class SchemaCompiler:
                     f"Regex pattern '{pattern}' not supported: {e}"
                 )
 
+        # Handle format constraint
+        if "format" in schema:
+            format_name = schema["format"]
+            try:
+                format_constraint = self._compile_format_constraint(
+                    str_val, format_name
+                )
+                constraints.append(format_constraint)
+            except Exception as e:
+                raise UnsupportedFeatureError(
+                    f"Format '{format_name}' not supported: {e}"
+                )
+
         return And(*constraints)
 
     def _convert_regex_pattern(self, pattern):
@@ -237,6 +258,198 @@ class SchemaCompiler:
         # This would need much more sophisticated regex parsing
         # For now, just support the most basic cases
         return Re(pattern)
+
+    def _compile_format_constraint(self, str_val, format_name):
+        """Compile format constraints using regex patterns or domain-specific logic.
+
+        For schema subsumption, format constraints are important because:
+        - Same format ⊆ same format (always true)
+        - Specific format ⊆ no format (more restrictive ⊆ less restrictive)
+        - Different formats usually incompatible
+        """
+
+        # Define regex patterns for common formats
+        format_patterns = {
+            "email": r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
+            "uri": r"^https?://[^\s/$.?#].[^\s]*$",
+            "uuid": r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "date": r"^\d{4}-\d{2}-\d{2}$",
+            "date-time": r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:\d{2})$",
+            "time": r"^\d{2}:\d{2}:\d{2}(?:\.\d{3})?$",
+            "ipv4": r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",
+            "ipv6": r"^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$",
+        }
+
+        if format_name in format_patterns:
+            pattern = format_patterns[format_name]
+            # For Z3, we'll use a simplified version that captures the essence
+            # Full regex matching in Z3 is complex, so we use approximations
+
+            if format_name == "email":
+                # Simplified: contains @ and has chars before and after
+                # Build pattern: .+@.+
+                any_char = Union(
+                    Range("a", "z"),
+                    Range("A", "Z"),
+                    Range("0", "9"),
+                    Re("."),
+                    Re("_"),
+                    Re("-"),
+                )
+                at_sign = Re("@")
+                email_pattern = Concat(Plus(any_char), at_sign, Plus(any_char))
+                return And(
+                    InRe(str_val, email_pattern),
+                    Length(str_val) >= IntVal(5),  # minimum reasonable email length
+                )
+            elif format_name == "uri":
+                # Simplified: starts with http:// or https://
+                # Build pattern: http(s)?://.*
+                any_char = Union(
+                    Range("a", "z"),
+                    Range("A", "Z"),
+                    Range("0", "9"),
+                    Re("."),
+                    Re("/"),
+                    Re("-"),
+                    Re("_"),
+                )
+                http_pattern = Concat(
+                    Re("http"), Option(Re("s")), Re("://"), Star(any_char)
+                )
+                ftp_pattern = Concat(Re("ftp://"), Star(any_char))
+                return Or(InRe(str_val, http_pattern), InRe(str_val, ftp_pattern))
+                ftp_pattern = Concat(Re("ftp://"), Star(any_char))
+                return Or(InRe(str_val, http_pattern), InRe(str_val, ftp_pattern))
+            elif format_name == "uuid":
+                # Simplified: correct length and contains hyphens at right positions
+                hex_char = Union(Range("0", "9"), Range("a", "f"), Range("A", "F"))
+                dash = Re("-")
+                uuid_pattern = Concat(
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    dash,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    dash,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    dash,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    dash,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                    hex_char,
+                )
+                return And(Length(str_val) == IntVal(36), InRe(str_val, uuid_pattern))
+            elif format_name == "date":
+                # Construct proper Z3 regex for YYYY-MM-DD format
+                # [0-9]{4} for year
+                digit = Range("0", "9")
+                year_part = Concat(digit, digit, digit, digit)
+                # Dash
+                dash = Re("-")
+                # [0-9]{2} for month
+                month_part = Concat(digit, digit)
+                # [0-9]{2} for day
+                day_part = Concat(digit, digit)
+                # Complete pattern: YYYY-MM-DD
+                date_pattern = Concat(year_part, dash, month_part, dash, day_part)
+
+                return And(
+                    Length(str_val) == IntVal(10),
+                    InRe(str_val, date_pattern),
+                )
+            elif format_name == "date-time":
+                # Simplified: YYYY-MM-DDTHH:MM:SS format
+                digit = Range("0", "9")
+                dash = Re("-")
+                colon = Re(":")
+                t_char = Re("T")
+                # Date part: YYYY-MM-DD
+                date_part = Concat(
+                    digit, digit, digit, digit, dash, digit, digit, dash, digit, digit
+                )
+                # Time part: HH:MM:SS
+                time_part = Concat(
+                    digit, digit, colon, digit, digit, colon, digit, digit
+                )
+                datetime_pattern = Concat(date_part, t_char, time_part)
+                return And(
+                    Length(str_val) >= IntVal(19),  # minimum for YYYY-MM-DDTHH:MM:SS
+                    InRe(str_val, datetime_pattern),
+                )
+            elif format_name == "time":
+                # Simplified: HH:MM:SS format
+                digit = Range("0", "9")
+                colon = Re(":")
+                time_pattern = Concat(
+                    digit, digit, colon, digit, digit, colon, digit, digit
+                )
+                return And(
+                    Length(str_val) >= IntVal(8),
+                    InRe(str_val, time_pattern),
+                )
+            elif format_name in ["ipv4", "ipv6"]:
+                if format_name == "ipv4":
+                    # Simplified: digits and dots
+                    digit = Range("0", "9")
+                    dot = Re(".")
+                    ipv4_pattern = Concat(
+                        Plus(digit),
+                        dot,
+                        Plus(digit),
+                        dot,
+                        Plus(digit),
+                        dot,
+                        Plus(digit),
+                    )
+                    return And(
+                        InRe(str_val, ipv4_pattern),
+                        Length(str_val) >= IntVal(7),  # minimum 0.0.0.0
+                    )
+                else:  # ipv6
+                    # Simplified: hex chars and colons
+                    hex_char = Union(Range("0", "9"), Range("a", "f"), Range("A", "F"))
+                    colon = Re(":")
+                    ipv6_pattern = Concat(
+                        Plus(hex_char), Star(Concat(colon, Plus(hex_char)))
+                    )
+                    return And(
+                        InRe(str_val, ipv6_pattern),
+                        Length(str_val) >= IntVal(2),
+                    )
+
+        # For unknown formats, create a symbolic constraint
+        # This allows format checking in subsumption without full validation
+        else:
+            # Create a predicate symbol for this specific format
+            format_pred = Bool(f"format_{format_name}")
+            # For subsumption checking, we assume the format constraint exists
+            # but don't validate its actual content
+            return format_pred
 
     def compile_object_constraints(self, json_var, schema):
         """Compile object-specific constraints (properties, required, additionalProperties)."""
@@ -388,6 +601,46 @@ class SchemaCompiler:
         if multiple_of is not None:
             multiple_constraint = (int_val(json_var) % IntVal(multiple_of)) == IntVal(0)
             constraints.append(Implies(is_int(json_var), multiple_constraint))
+
+        if not constraints:
+            return BoolVal(True)
+        elif len(constraints) == 1:
+            return constraints[0]
+        else:
+            return And(*constraints)
+
+    def compile_conditional_constraints(self, json_var, schema):
+        """Compile if/then/else conditional constraints per JSON Schema Draft 7.
+
+        The logic is:
+        - if condition AND then_schema: (condition → then_constraint)
+        - if condition AND else_schema: (¬condition → else_constraint)
+        - Both can be present simultaneously
+        """
+        if_schema = schema.get("if")
+        then_schema = schema.get("then")
+        else_schema = schema.get("else")
+
+        constraints = []
+
+        if if_schema:
+            if_constraint = self.compile_schema(if_schema, json_var)
+
+            # If-then: when condition holds, then_schema must be satisfied
+            if then_schema:
+                then_constraint = self.compile_schema(then_schema, json_var)
+                constraints.append(Implies(if_constraint, then_constraint))
+
+            # If-else: when condition doesn't hold, else_schema must be satisfied
+            if else_schema:
+                else_constraint = self.compile_schema(else_schema, json_var)
+                constraints.append(Implies(Not(if_constraint), else_constraint))
+
+        # Handle edge cases: then/else without if (uncommon but valid)
+        elif then_schema and not if_schema:
+            # then without if means always apply then_schema
+            then_constraint = self.compile_schema(then_schema, json_var)
+            constraints.append(then_constraint)
 
         if not constraints:
             return BoolVal(True)

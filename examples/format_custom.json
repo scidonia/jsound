@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "data": {
+      "type": "string",
+      "format": "custom-format-xyz"
+    }
+  },
+  "required": ["data"]
+}

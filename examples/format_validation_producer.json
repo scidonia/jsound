@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "website": {
+      "type": "string",
+      "format": "uri"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "birth_date": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": ["email", "created_at"]
+}
