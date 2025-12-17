@@ -12,13 +12,13 @@ This directory contains realistic JSON schema examples that demonstrate various 
 **Result:** ✅ Compatible - v1 producers work with v2 consumers
 **Pattern:** Adding optional fields while removing additionalProperties restriction
 
-### E-commerce Product Evolution (Incompatible)
-- **ecommerce_product_v1.json**: v1 with limited currency enum and strict properties
+### E-commerce Product Evolution (Compatible)
+- **ecommerce_product_v1.json**: v1 with limited currency enum and strict properties  
 - **ecommerce_product_v2_expanded.json**: v2 with expanded currency options and flexible properties
 
 **Test:** `jsound ecommerce_product_v1.json ecommerce_product_v2_expanded.json`
-**Result:** ❌ Incompatible - conflicting evolution (enum expansion vs strict properties)
-**Pattern:** Shows how expanding enums while adding flexibility can break compatibility
+**Result:** ✅ Compatible - v1's enum subset works with v2's expanded enum, strict properties compatible with flexible
+**Pattern:** Shows successful backward-compatible API evolution: enum expansion + removing property restrictions
 
 ## Configuration Schema Examples
 
@@ -72,11 +72,12 @@ jsound examples/format_email_only.json examples/format_different.json --verbose
 
 ## Schema Evolution Patterns Demonstrated
 
-1. **Backward Compatible Evolution**: Adding optional fields
-2. **Breaking Changes**: Expanding enums while restricting additional properties  
+1. **Backward Compatible Evolution**: Adding optional fields and expanding enums
+2. **Property Flexibility**: Removing additionalProperties restrictions maintains compatibility
 3. **API Response Flexibility**: Using anyOf for multiple data types
 4. **Configuration Validation**: Required fields with type and range constraints
 5. **Format Validation**: Email, URI, date, date-time format constraints and subsumption
-6. **Conditional Logic**: if/then/else constraints for conditional validation
+6. **Format Incompatibility**: Different format constraints are mutually exclusive
+7. **Conditional Logic**: if/then/else constraints for conditional validation
 
 These examples help understand when schema changes maintain compatibility and when they introduce breaking changes.
