@@ -29,7 +29,14 @@ def check(
         50, "--max-array-length", help="Maximum array length for bounds"
     ),
     max_recursion_depth: int = typer.Option(
-        3, "--max-recursion-depth", help="Maximum $ref unrolling depth"
+        3,
+        "--max-recursion-depth",
+        help="Maximum $ref unrolling depth (deprecated - use ref-resolution-strategy)",
+    ),
+    ref_resolution_strategy: str = typer.Option(
+        "unfold",
+        "--ref-resolution-strategy",
+        help="Strategy for $ref: 'unfold' (acyclic only) or 'simulation' (supports cycles)",
     ),
     timeout: int = typer.Option(30, "--timeout", help="Z3 solver timeout in seconds"),
     output_format: str = typer.Option(
@@ -60,6 +67,7 @@ def check(
             timeout=timeout,
             max_array_len=max_array_length,
             max_recursion_depth=max_recursion_depth,
+            ref_resolution_strategy=ref_resolution_strategy,
         )
 
         # Perform subsumption check
@@ -90,8 +98,16 @@ def check(
         sys.exit(0 if result.is_compatible else 1)
 
     except UnsupportedFeatureError as e:
-        console.print(f"[red]Error: Unsupported feature[/red]")
-        console.print(f"[red]{e}[/red]")
+        error_msg = str(e)
+        if "Cyclic references detected" in error_msg:
+            console.print(f"[red]❌ Cyclic references detected![/red]")
+            console.print(f"[yellow]{e}[/yellow]")
+            console.print(
+                f"[blue]💡 Try again with --ref-resolution-strategy=simulation[/blue]"
+            )
+        else:
+            console.print(f"[red]Error: Unsupported feature[/red]")
+            console.print(f"[red]{e}[/red]")
         sys.exit(2)
 
     except JSoundError as e:

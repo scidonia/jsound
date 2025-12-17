@@ -1,0 +1,27 @@
+{
+  "$defs": {
+    "User": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "name": {"type": "string"},
+        "profile": {"$ref": "#/$defs/Profile"}
+      },
+      "required": ["id", "name"]
+    },
+    "Profile": {
+      "type": "object",
+      "properties": {
+        "bio": {"type": "string"},
+        "avatar_url": {"type": "string"}
+      }
+    }
+  },
+  "type": "object",
+  "properties": {
+    "users": {
+      "type": "array", 
+      "items": {"$ref": "#/$defs/User"}
+    }
+  }
+}

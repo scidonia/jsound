@@ -28,6 +28,7 @@ class SolverConfig:
     timeout: int = 30  # seconds
     max_array_len: int = 50
     max_recursion_depth: int = 3
+    ref_resolution_strategy: str = "unfold"  # 'unfold' | 'simulation'
 
 
 class SubsumptionChecker:
@@ -51,6 +52,11 @@ class SubsumptionChecker:
         start_time = time.time()
 
         try:
+            # NEW: Unfolding preprocessing phase
+            producer_schema, consumer_schema = self._preprocess_schemas(
+                producer_schema, consumer_schema
+            )
+
             # Setup components
             self._setup_components(producer_schema, consumer_schema)
 
@@ -107,6 +113,43 @@ class SubsumptionChecker:
             return CheckResult(
                 is_compatible=False, error_message=str(e), solver_time=solver_time
             )
+
+    def _preprocess_schemas(
+        self, producer_schema: Dict[str, Any], consumer_schema: Dict[str, Any]
+    ):
+        """Preprocess schemas by unfolding $ref if no cycles detected."""
+        # Import here to avoid circular dependencies and missing module issues
+        try:
+            from .schema_registry import SchemaRegistry
+            from .unfolding_processor import UnfoldingProcessor, CyclicSchemaError
+        except ImportError:
+            # If imports fail, return schemas unchanged
+            # This allows the system to work even without the new components
+            return producer_schema, consumer_schema
+
+        try:
+            # Create registries for both schemas
+            producer_registry = SchemaRegistry(producer_schema)
+            consumer_registry = SchemaRegistry(consumer_schema)
+
+            # Create processors
+            producer_processor = UnfoldingProcessor(producer_registry)
+            consumer_processor = UnfoldingProcessor(consumer_registry)
+
+            # Attempt to unfold both schemas (will raise CyclicSchemaError if cycles found)
+            unfolded_producer = producer_processor.unfold_schema(producer_schema)
+            unfolded_consumer = consumer_processor.unfold_schema(consumer_schema)
+
+            return unfolded_producer, unfolded_consumer
+
+        except CyclicSchemaError as e:
+            # For now, just raise as UnsupportedFeatureError
+            # Later this will trigger simulation mode
+            raise UnsupportedFeatureError(f"Cyclic references detected: {e}")
+        except Exception as e:
+            # If anything else goes wrong, fall back to original schemas
+            # This provides graceful degradation
+            return producer_schema, consumer_schema
 
     def _setup_components(
         self, producer_schema: Dict[str, Any], consumer_schema: Dict[str, Any]

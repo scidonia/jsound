@@ -10,6 +10,7 @@ dependencies = [
     "jsonschema>=4.20.0",
     "pydantic>=2.5.0",
     "rich>=13.7.0",
+    "pytest>=9.0.2",
 ]
 
 [build-system]
@@ -26,4 +27,28 @@ dev = [
     "black>=23.9.0",
     "mypy>=1.6.0",
     "ruff>=0.1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "-x",  # stop on first failure
+]
+markers = [
+    "subsumption: tests for valid subsumption cases (producer ⊆ consumer)",
+    "anti_subsumption: tests for invalid subsumption cases (producer ⊄ consumer)", 
+    "refs: tests for $ref resolution and unfolding",
+    "anyof: tests for anyOf boolean composition",
+    "allof: tests for allOf boolean composition",
+    "oneOf: tests for oneOf boolean composition",
+    "objects: tests for object property constraints",
+    "arrays: tests for array item and length constraints",
+    "strings: tests for string pattern and length constraints",
+    "numbers: tests for numeric type and range constraints",
+    "real_world: tests using real-world schema examples",
 ]

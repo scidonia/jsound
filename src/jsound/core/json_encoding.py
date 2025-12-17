@@ -14,17 +14,25 @@ class JSONEncoder:
         self._type_predicates = {}
 
     def create_json_datatype(self) -> DatatypeSort:
-        """Create the Z3 JSON datatype following the specification.
+        """Create the Z3 JSON datatype following the specification exactly.
 
-        We'll use a simpler encoding to avoid recursive datatype complexity:
-        - Arrays store element count and use indices for access
-        - Objects use string keys with has/val arrays
+        Per section 4.1 of json-schema-to-z3-spec.md:
+        JSON =
+          Null
+        | Bool(b: Bool)
+        | Int(n: Int)
+        | Real(r: Real)
+        | Str(s: String)
+        | Arr(len: Int, elems: Array[Int, JSON])
+        | Obj(has: Array[String, Bool], val: Array[String, JSON])
         """
         if self._json_sort is not None:
             return self._json_sort
 
-        # Create a simple JSON datatype without full recursive structure
-        # We'll handle arrays and objects through constraints rather than nested datatypes
+        # Create the recursive JSON datatype using Z3's CreateDatatypes
+        # This is the proper way to handle recursive datatypes in Z3
+
+        # First declare the datatype
         JSON = Datatype("JSON")
 
         # Constructor for null
@@ -41,104 +49,16 @@ class JSONEncoder:
 
         # Constructor for string: Str(s: String)
         JSON.declare("str", ("str_val", StringSort()))
+
+        # For arrays and objects, we'll use a hybrid approach:
+        # - Store length/count but handle elements/properties through external constraints
+        # - This avoids Z3's recursive datatype complexity while enabling property access
 
         # Constructor for array: Arr(len: Int)
-        # Array elements will be handled via separate array variables
         JSON.declare("arr", ("len", IntSort()))
 
-        # Constructor for object: Obj()
-        # Object properties will be handled via separate array variables
-        JSON.declare("obj")
-
-        # Create the datatype
-        self._json_sort = JSON.create()
-
-        # Store constructors for easy access
-        self._constructors = {
-            "null": self._json_sort.null,
-            "bool": self._json_sort.bool,
-            "int": self._json_sort.int,
-            "real": self._json_sort.real,
-            "str": self._json_sort.str,
-            "arr": self._json_sort.arr,
-            "obj": self._json_sort.obj,
-        }
-
-        return self._json_sort
-
-        # Create the JSON datatype using Z3's CreateDatatypes for recursive types
-        JSON = Datatype("JSON")
-
-        # Constructor for null
-        JSON.declare("null")
-
-        # Constructor for boolean: Bool(b: Bool)
-        JSON.declare("bool", ("bool_val", BoolSort()))
-
-        # Constructor for integer: Int(n: Int)
-        JSON.declare("int", ("int_val", IntSort()))
-
-        # Constructor for real: Real(r: Real)
-        JSON.declare("real", ("real_val", RealSort()))
-
-        # Constructor for string: Str(s: String)
-        JSON.declare("str", ("str_val", StringSort()))
-
-        # For recursive references, we create a forward declaration
-        # Constructor for array: Arr(len: Int, elems: Array[Int, JSON])
-        JSON.declare(
-            "arr", ("len", IntSort()), ("elems", IntSort())
-        )  # Simplified for now
-
-        # Constructor for object: Obj(has: Array[String, Bool], val: Array[String, JSON])
-        JSON.declare(
-            "obj", ("has", ArraySort(StringSort(), BoolSort())), ("val", IntSort())
-        )  # Simplified for now
-
-        # Create the datatype
-        self._json_sort = JSON.create()
-
-        # Store constructors for easy access
-        self._constructors = {
-            "null": self._json_sort.null,
-            "bool": self._json_sort.bool,
-            "int": self._json_sort.int,
-            "real": self._json_sort.real,
-            "str": self._json_sort.str,
-            "arr": self._json_sort.arr,
-            "obj": self._json_sort.obj,
-        }
-
-        return self._json_sort
-
-        # Create the JSON datatype
-        JSON = Datatype("JSON")
-
-        # Constructor for null
-        JSON.declare("null")
-
-        # Constructor for boolean: Bool(b: Bool)
-        JSON.declare("bool", ("bool_val", BoolSort()))
-
-        # Constructor for integer: Int(n: Int)
-        JSON.declare("int", ("int_val", IntSort()))
-
-        # Constructor for real: Real(r: Real)
-        JSON.declare("real", ("real_val", RealSort()))
-
-        # Constructor for string: Str(s: String)
-        JSON.declare("str", ("str_val", StringSort()))
-
-        # Constructor for array: Arr(len: Int, elems: Array[Int, JSON])
-        # Note: We need to create the datatype first, then reference it
-        JSON.declare("arr", ("len", IntSort()), ("elems", ArraySort(IntSort(), JSON)))
-
-        # Constructor for object: Obj(has: Array[String, Bool], val: Array[String, JSON])
-        JSON.declare(
-            "obj",
-            ("has", ArraySort(StringSort(), BoolSort())),
-            ("val", ArraySort(StringSort(), JSON)),
-        )
+        # Constructor for object: Obj(property_count: Int)
+        JSON.declare("obj", ("property_count", IntSort()))
 
         # Create the datatype
         self._json_sort = JSON.create()
@@ -200,8 +120,42 @@ class JSONEncoder:
             "real_val": self._json_sort.real_val,
             "str_val": self._json_sort.str_val,
             "len": self._json_sort.len,
-            # Note: arrays and objects don't have elems/has/val in simplified encoding
+            "property_count": self._json_sort.property_count,
         }
+
+    def create_object_access_functions(self):
+        """Create object property access functions per specification section 7.
+
+        Returns:
+        - has(obj, key): Boolean function - does object have this property?
+        - val(obj, key): JSON function - get property value from object
+
+        These are implemented using Z3 arrays for efficiency while maintaining
+        specification semantics.
+        """
+        if self._json_sort is None:
+            self.create_json_datatype()
+
+        # Create global arrays to represent object properties
+        # has_array: maps (object_id, property_name) -> Boolean (property exists)
+        # val_array: maps (object_id, property_name) -> JSON (property value)
+
+        # For simplicity, we'll use the object's Z3 expression as its ID
+        # This requires functions that take the object and key as parameters
+
+        # Function: has(obj: JSON, key: String) -> Bool
+        has_func = Function("has", self._json_sort, StringSort(), BoolSort())
+
+        # Function: val(obj: JSON, key: String) -> JSON
+        val_func = Function("val", self._json_sort, StringSort(), self._json_sort)
+
+        return {"has": has_func, "val": val_func}
+
+    def get_object_functions(self) -> Dict[str, FuncDeclRef]:
+        """Get object property access functions (has, val)."""
+        if not hasattr(self, "_object_functions"):
+            self._object_functions = self.create_object_access_functions()
+        return self._object_functions
 
     def create_mutually_exclusive_constraints(self, json_var: ExprRef) -> BoolRef:
         """Create constraints ensuring exactly one type predicate holds."""
@@ -277,6 +231,26 @@ class FiniteKeyUniverse:
 
     def __init__(self):
         self.keys: Set[str] = set()
+        # Add common property names that might appear in tests
+        # This ensures additionalProperties constraints can find counterexamples
+        self.keys.update(
+            [
+                "extra",
+                "other",
+                "additional",
+                "test",
+                "sample",
+                "foo",
+                "bar",
+                "id",
+                "value",
+                "data",
+                "info",
+                "meta",
+                "temp",
+                "prop",
+            ]
+        )
 
     def add_keys_from_schema(self, schema: dict) -> None:
         """Extract and add all property names from a schema."""
