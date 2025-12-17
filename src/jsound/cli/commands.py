@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 from rich import print as rprint
 
+from ..api import JSoundAPI, SubsumptionResult
 from ..core.subsumption import SubsumptionChecker, SolverConfig, CheckResult
 from ..exceptions import JSoundError, UnsupportedFeatureError
 
@@ -46,6 +47,11 @@ def check(
         None, "--counterexample-file", help="Save counterexample to file"
     ),
     verbose: bool = typer.Option(False, "--verbose", help="Enable verbose output"),
+    explanations: bool = typer.Option(
+        True,
+        "--explanations/--no-explanations",
+        help="Show detailed explanations for incompatibility",
+    ),
     show_verification: bool = typer.Option(
         False,
         "--show-verification",
@@ -77,12 +83,18 @@ def check(
         )
 
         # Perform subsumption check
-        checker = SubsumptionChecker(config)
+        # Use enhanced API for better explanations
+        api = JSoundAPI(
+            timeout=timeout,
+            max_array_length=max_array_length,
+            ref_resolution_strategy=ref_resolution_strategy,
+            explanations=explanations,
+        )
 
         if verbose:
             console.print("[blue]Starting subsumption check...[/blue]")
 
-        result = checker.check_subsumption(producer_schema, consumer_schema)
+        result = api.check_subsumption(producer_schema, consumer_schema)
 
         # Handle output
         if output_format == "json":
@@ -141,7 +153,7 @@ def load_schema(schema_file: Path) -> dict:
         raise JSoundError(f"Invalid JSON in schema file {schema_file}: {e}")
 
 
-def output_json(result: CheckResult) -> None:
+def output_json(result: SubsumptionResult) -> None:
     """Output result in JSON format."""
     output = {
         "compatible": result.is_compatible,
@@ -153,7 +165,7 @@ def output_json(result: CheckResult) -> None:
     print(json.dumps(output, indent=2))
 
 
-def output_minimal(result: CheckResult) -> None:
+def output_minimal(result: SubsumptionResult) -> None:
     """Output result in minimal format."""
     if result.is_compatible:
         print("compatible")
@@ -164,7 +176,7 @@ def output_minimal(result: CheckResult) -> None:
 
 
 def output_pretty(
-    result: CheckResult, verbose: bool = False, show_verification: bool = False
+    result: SubsumptionResult, verbose: bool = False, show_verification: bool = False
 ) -> None:
     """Output result in pretty format."""
 
@@ -214,6 +226,21 @@ def output_pretty(
             )
             rprint("\n[yellow]Counterexample:[/yellow]")
             rprint(json.dumps(result.counterexample, indent=2))
+
+            # Show enhanced explanations if available
+            if hasattr(result, "explanation") and result.explanation:
+                rprint("\n[cyan]🧠 Explanation:[/cyan]")
+                rprint(f"[dim]{result.explanation}[/dim]")
+
+            if hasattr(result, "failed_constraints") and result.failed_constraints:
+                rprint("\n[yellow]⚠️  Failed Constraints:[/yellow]")
+                for constraint in result.failed_constraints:
+                    rprint(f"[dim]  • {constraint}[/dim]")
+
+            if hasattr(result, "recommendations") and result.recommendations:
+                rprint("\n[green]💡 Recommendations:[/green]")
+                for rec in result.recommendations:
+                    rprint(f"[dim]  • {rec}[/dim]")
         else:
             rprint(
                 "Found counterexample that satisfies producer but violates consumer:"
