@@ -71,7 +71,7 @@ class SchemaCompiler:
                 constraints.append(self.compile_object_constraints(json_var, schema))
 
             # Handle array constraints
-            if any(k in schema for k in ["items", "minItems", "maxItems"]):
+            if any(k in schema for k in ["items", "minItems", "maxItems", "contains"]):
                 constraints.append(self.compile_array_constraints(json_var, schema))
 
             # Handle number constraints
@@ -515,6 +515,13 @@ class SchemaCompiler:
             )
             constraints.append(length_constraint)
 
+        # Handle contains constraints
+        if "contains" in schema:
+            contains_constraint = builder.build_contains_constraints(
+                json_var, schema["contains"], self
+            )
+            constraints.append(contains_constraint)
+
         if not constraints:
             return BoolVal(True)
         elif len(constraints) == 1:
@@ -873,3 +880,46 @@ class ArrayConstraintBuilder:
             constraint = And(*constraints)
 
         return Implies(is_arr(json_var), constraint)
+
+    def build_contains_constraints(self, json_var, contains_schema, compiler):
+        """Build contains constraints for arrays.
+
+        The 'contains' keyword validates that at least one element in the array
+        satisfies the given schema. This is implemented using existential
+        quantification: ∃i ∈ [0, len-1] such that element[i] satisfies contains_schema.
+
+        Uses bounded approach similar to items constraints.
+        """
+        MAX_ARRAY_LEN = 8  # Same as items constraints
+
+        # Get array type predicate and accessors
+        type_predicates = compiler.json_encoder.create_type_predicates()
+        accessors = compiler.json_encoder.get_accessors()
+        is_arr = type_predicates["is_arr"]
+        arr_len = accessors["len"]
+
+        # Create external array elements function
+        json_sort = compiler.json_encoder.get_json_sort()
+        arr_elems = Function("arr_elems", json_sort, ArraySort(IntSort(), json_sort))
+
+        # Build existential constraint: there exists at least one valid element
+        # OR over all possible indices i where i < len and element[i] satisfies schema
+        exists_constraints = []
+        for i in range(MAX_ARRAY_LEN):
+            element_at_i = Select(arr_elems(json_var), IntVal(i))
+            element_satisfies_schema = compiler.compile_schema(
+                contains_schema, element_at_i
+            )
+
+            # This element exists (i < len) AND satisfies the contains schema
+            element_valid = And(IntVal(i) < arr_len(json_var), element_satisfies_schema)
+            exists_constraints.append(element_valid)
+
+        # At least one element must satisfy the constraint
+        contains_constraint = Or(*exists_constraints)
+
+        # Only apply to non-empty arrays (contains has no effect on empty arrays)
+        # Per JSON Schema spec: "contains" succeeds on empty arrays
+        return Implies(
+            And(is_arr(json_var), arr_len(json_var) > 0), contains_constraint
+        )

@@ -193,7 +193,7 @@ class SubsumptionChecker:
         self.schema_compiler.max_recursion_depth = self.config.max_recursion_depth
 
         # Create witness extractor
-        self.witness_extractor = WitnessExtractor(self.json_encoder)
+        self.witness_extractor = WitnessExtractor(self.json_encoder, key_universe)
 
     def _setup_solver(self) -> Solver:
         """Setup Z3 solver with configuration."""

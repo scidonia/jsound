@@ -52,4 +52,5 @@ markers = [
     "numbers: tests for numeric type and range constraints",
     "real_world: tests using real-world schema examples",
     "evolution: tests for schema evolution and API compatibility",
+    "contains: tests for array 'contains' keyword validation",
 ]

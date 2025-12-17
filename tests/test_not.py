@@ -37,52 +37,62 @@ class TestNotKeyword:
             "Producer excluding empty string should subsume consumer requiring non-empty string"
         )
 
-    def test_not_specific_value_exclusion(self, api):
-        """Test that 'not' can exclude specific constant values when constrained."""
-        # Producer: status must be string AND NOT be "error"
+    def test_not_with_constrained_positive_assertion(self, api):
+        """Test 'not' combined with positive constraints creating compatibility."""
+        # Producer: must be positive integer (integer > 0)
         producer = {
             "type": "object",
             "properties": {
-                "status": {"allOf": [{"type": "string"}, {"not": {"const": "error"}}]}
-            },
-            "required": ["status"],
-        }
-
-        # Consumer: status must be exactly "success"
-        consumer = {
-            "type": "object",
-            "properties": {"status": {"const": "success"}},
-            "required": ["status"],
-        }
-
-        result = api.check_subsumption(producer, consumer)
-        assert result.is_compatible, (
-            "Producer (string excluding 'error') should subsume consumer requiring 'success'"
-        )
-
-    def test_not_enum_subset_compatibility(self, api):
-        """Test 'not' with enum exclusion creating compatibility."""
-        # Producer: priority must be string AND NOT in ["low", "trivial"]
-        producer = {
-            "type": "object",
-            "properties": {
-                "priority": {
-                    "allOf": [{"type": "string"}, {"not": {"enum": ["low", "trivial"]}}]
+                "count": {
+                    "allOf": [
+                        {"type": "integer"},
+                        {"minimum": 1},  # Positive constraint
+                    ]
                 }
             },
+            "required": ["count"],
+        }
+
+        # Consumer: must be integer AND NOT be negative or zero
+        consumer = {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "allOf": [
+                        {"type": "integer"},
+                        {"not": {"maximum": 0}},  # NOT <= 0 (i.e., > 0)
+                    ]
+                }
+            },
+            "required": ["count"],
+        }
+
+        result = api.check_subsumption(producer, consumer)
+        assert result.is_compatible, (
+            "Producer with positive integers should subsume consumer excluding non-positive integers"
+        )
+
+    def test_not_enum_compatibility_with_intersection(self, api):
+        """Test 'not' enum creating compatibility when consumer is subset of allowed values."""
+        # Producer: priority must be in ["high", "critical", "urgent"]
+        producer = {
+            "type": "object",
+            "properties": {"priority": {"enum": ["high", "critical", "urgent"]}},
             "required": ["priority"],
         }
 
-        # Consumer: priority must be "high" or "critical"
+        # Consumer: priority must NOT be "low" AND must be string
         consumer = {
             "type": "object",
-            "properties": {"priority": {"enum": ["high", "critical"]}},
+            "properties": {
+                "priority": {"allOf": [{"type": "string"}, {"not": {"const": "low"}}]}
+            },
             "required": ["priority"],
         }
 
         result = api.check_subsumption(producer, consumer)
         assert result.is_compatible, (
-            "Producer (string excluding low priorities) should subsume consumer requiring high priorities"
+            "Producer with specific high priorities should subsume consumer excluding 'low'"
         )
 
     def test_not_self_subsumption(self, api):
@@ -195,26 +205,38 @@ class TestNotKeywordComplexScenarios:
     """Test complex 'not' keyword scenarios."""
 
     def test_not_with_allof_combination(self, api):
-        """Test 'not' combined with allOf constraints."""
-        # Producer: must be integer AND NOT be zero
+        """Test 'not' combined with allOf constraints creating compatibility."""
+        # Producer: must be positive integer (>= 1)
         producer = {
             "type": "object",
             "properties": {
-                "count": {"allOf": [{"type": "integer"}, {"not": {"const": 0}}]}
+                "count": {
+                    "allOf": [
+                        {"type": "integer"},
+                        {"minimum": 1},  # Positive integers
+                    ]
+                }
             },
             "required": ["count"],
         }
 
-        # Consumer: must be positive integer (> 0)
+        # Consumer: must be integer AND NOT be negative
         consumer = {
             "type": "object",
-            "properties": {"count": {"type": "integer", "minimum": 1}},
+            "properties": {
+                "count": {
+                    "allOf": [
+                        {"type": "integer"},
+                        {"not": {"maximum": -1}},  # NOT <= -1 (i.e., >= 0)
+                    ]
+                }
+            },
             "required": ["count"],
         }
 
         result = api.check_subsumption(producer, consumer)
         assert result.is_compatible, (
-            "Producer (integer excluding 0) should subsume consumer (positive integer)"
+            "Producer (positive integers) should subsume consumer (excluding negative integers)"
         )
 
     def test_not_double_negation(self, api):
@@ -238,10 +260,17 @@ class TestNotKeywordComplexScenarios:
             "Double negation should be equivalent to positive assertion"
         )
 
-    def test_not_with_format_exclusion(self, api):
-        """Test 'not' excluding format constraints."""
-        # Producer: must be string but NOT email format
+    def test_not_with_format_compatibility(self, api):
+        """Test 'not' format creating compatibility in the right direction."""
+        # Producer: must be string with uri format
         producer = {
+            "type": "object",
+            "properties": {"identifier": {"type": "string", "format": "uri"}},
+            "required": ["identifier"],
+        }
+
+        # Consumer: must be string but NOT email format
+        consumer = {
             "type": "object",
             "properties": {
                 "identifier": {
@@ -251,16 +280,9 @@ class TestNotKeywordComplexScenarios:
             "required": ["identifier"],
         }
 
-        # Consumer: must be string with uri format
-        consumer = {
-            "type": "object",
-            "properties": {"identifier": {"type": "string", "format": "uri"}},
-            "required": ["identifier"],
-        }
-
         result = api.check_subsumption(producer, consumer)
         assert result.is_compatible, (
-            "Producer excluding email format should subsume consumer requiring uri format"
+            "Producer with uri format should subsume consumer excluding email format"
         )
 
 
