@@ -8,7 +8,7 @@ from z3 import *
 from .json_encoding import JSONEncoder, FiniteKeyUniverse
 from .schema_compiler import SchemaCompiler
 from .witness import WitnessExtractor
-from ..exceptions import SolverTimeoutError, JSoundError
+from ..exceptions import SolverTimeoutError, JSoundError, UnsupportedFeatureError
 
 
 @dataclass

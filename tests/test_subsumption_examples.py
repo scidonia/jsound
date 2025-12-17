@@ -30,7 +30,7 @@ class TestSubsumptionExamples(unittest.TestCase):
         consumer = {"type": "number"}
 
         result = self.api.check_subsumption(producer, consumer)
-        self.assertFalse(result.is_compatible, "Should not be subsumed")
+        self.assertTrue(result.is_compatible, "Integer should be subsumed by number")
 
     def test_user_profile_subsumption(self):
         """Test user profile schema subsumption."""
@@ -57,7 +57,10 @@ class TestSubsumptionExamples(unittest.TestCase):
         }
 
         result = self.api.check_subsumption(strict_user, loose_user)
-        self.assertFalse(result.is_compatible, "Should not be subsumed")
+        self.assertTrue(
+            result.is_compatible,
+            "Strict user (more required fields) should be subsumed by loose user (fewer required fields)",
+        )
 
     def test_geographical_location_subsumption(self):
         """Test geographical location schema subsumption."""
@@ -82,7 +85,10 @@ class TestSubsumptionExamples(unittest.TestCase):
         }
 
         result = self.api.check_subsumption(exact_location, general_location)
-        self.assertFalse(result.is_compatible, "Should not be subsumed")
+        self.assertTrue(
+            result.is_compatible,
+            "Exact location (narrow bounds) should be subsumed by general location (wide bounds)",
+        )
 
     def test_array_length_subsumption(self):
         """Test array length constraint subsumption."""
@@ -103,7 +109,10 @@ class TestSubsumptionExamples(unittest.TestCase):
         }
 
         result = self.api.check_subsumption(short_array, long_array)
-        self.assertFalse(result.is_compatible, "Should not be subsumed")
+        self.assertTrue(
+            result.is_compatible,
+            "Short array [1-3 items] should be subsumed by long array [0-10 items]",
+        )
 
     def test_object_additional_properties(self):
         """Test object with additionalProperties subsumption."""
@@ -122,7 +131,10 @@ class TestSubsumptionExamples(unittest.TestCase):
         }
 
         result = self.api.check_subsumption(strict_object, flexible_object)
-        self.assertFalse(result.is_compatible, "Should not be subsumed")
+        self.assertTrue(
+            result.is_compatible,
+            "Strict object (no additional properties) should be subsumed by flexible object (additional properties allowed)",
+        )
 
 
 if __name__ == "__main__":
