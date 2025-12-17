@@ -331,12 +331,21 @@ class SchemaCompiler:
         # Build bounds constraints for integers
         int_constraints = []
         if minimum is not None:
-            int_constraints.append(int_val(json_var) >= IntVal(minimum))
+            if exclusive_minimum is True:
+                # JSON Schema Draft 7: exclusiveMinimum: true means minimum is exclusive
+                int_constraints.append(int_val(json_var) > IntVal(minimum))
+            else:
+                int_constraints.append(int_val(json_var) >= IntVal(minimum))
         if maximum is not None:
-            int_constraints.append(int_val(json_var) <= IntVal(maximum))
-        if exclusive_minimum is not None:
+            if exclusive_maximum is True:
+                # JSON Schema Draft 7: exclusiveMaximum: true means maximum is exclusive
+                int_constraints.append(int_val(json_var) < IntVal(maximum))
+            else:
+                int_constraints.append(int_val(json_var) <= IntVal(maximum))
+        # Handle numeric exclusiveMinimum/exclusiveMaximum (JSON Schema Draft 6 style)
+        if exclusive_minimum is not None and exclusive_minimum is not True:
             int_constraints.append(int_val(json_var) > IntVal(exclusive_minimum))
-        if exclusive_maximum is not None:
+        if exclusive_maximum is not None and exclusive_maximum is not True:
             int_constraints.append(int_val(json_var) < IntVal(exclusive_maximum))
 
         if int_constraints:
@@ -350,12 +359,21 @@ class SchemaCompiler:
         # Build bounds constraints for reals
         real_constraints = []
         if minimum is not None:
-            real_constraints.append(real_val(json_var) >= RealVal(minimum))
+            if exclusive_minimum is True:
+                # JSON Schema Draft 7: exclusiveMinimum: true means minimum is exclusive
+                real_constraints.append(real_val(json_var) > RealVal(minimum))
+            else:
+                real_constraints.append(real_val(json_var) >= RealVal(minimum))
         if maximum is not None:
-            real_constraints.append(real_val(json_var) <= RealVal(maximum))
-        if exclusive_minimum is not None:
+            if exclusive_maximum is True:
+                # JSON Schema Draft 7: exclusiveMaximum: true means maximum is exclusive
+                real_constraints.append(real_val(json_var) < RealVal(maximum))
+            else:
+                real_constraints.append(real_val(json_var) <= RealVal(maximum))
+        # Handle numeric exclusiveMinimum/exclusiveMaximum (JSON Schema Draft 6 style)
+        if exclusive_minimum is not None and exclusive_minimum is not True:
             real_constraints.append(real_val(json_var) > RealVal(exclusive_minimum))
-        if exclusive_maximum is not None:
+        if exclusive_maximum is not None and exclusive_maximum is not True:
             real_constraints.append(real_val(json_var) < RealVal(exclusive_maximum))
 
         if real_constraints:

@@ -51,4 +51,5 @@ markers = [
     "strings: tests for string pattern and length constraints",
     "numbers: tests for numeric type and range constraints",
     "real_world: tests using real-world schema examples",
+    "evolution: tests for schema evolution and API compatibility",
 ]

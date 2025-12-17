@@ -19,6 +19,11 @@ class CheckResult:
     counterexample: Optional[Dict[str, Any]] = None
     solver_time: Optional[float] = None
     error_message: Optional[str] = None
+    # New fields for verification visibility
+    producer_constraints: Optional[str] = None
+    consumer_constraints: Optional[str] = None
+    verification_formula: Optional[str] = None
+    z3_model: Optional[str] = None
 
 
 @dataclass
@@ -29,6 +34,7 @@ class SolverConfig:
     max_array_len: int = 50
     max_recursion_depth: int = 3
     ref_resolution_strategy: str = "unfold"  # 'unfold' | 'simulation'
+    capture_verification_details: bool = False  # Capture detailed info for CLI
 
 
 class SubsumptionChecker:
@@ -80,6 +86,15 @@ class SubsumptionChecker:
                 consumer_schema, json_var
             )
 
+            # Capture verification details if requested
+            verification_details = {}
+            if self.config.capture_verification_details:
+                verification_details = {
+                    "producer_constraints": str(producer_constraint),
+                    "consumer_constraints": str(consumer_constraint),
+                    "verification_formula": f"({producer_constraint}) ∧ ¬({consumer_constraint})",
+                }
+
             # Add P ∧ ¬C
             solver.add(producer_constraint)
             solver.add(Not(consumer_constraint))
@@ -93,19 +108,28 @@ class SubsumptionChecker:
                 # Counterexample found - schemas are incompatible
                 model = solver.model()
                 counterexample = self.witness_extractor.extract_counterexample(model)
+
+                # Add Z3 model details if requested
+                if self.config.capture_verification_details:
+                    verification_details["z3_model"] = str(model)
+
                 return CheckResult(
                     is_compatible=False,
                     counterexample=counterexample,
                     solver_time=solver_time,
+                    **verification_details,
                 )
             elif result == unsat:
                 # No counterexample - schemas are compatible
-                return CheckResult(is_compatible=True, solver_time=solver_time)
+                return CheckResult(
+                    is_compatible=True, solver_time=solver_time, **verification_details
+                )
             else:  # unknown
                 return CheckResult(
                     is_compatible=False,
                     error_message=f"Z3 solver returned unknown after {solver_time:.2f}s",
                     solver_time=solver_time,
+                    **verification_details,
                 )
 
         except Exception as e:

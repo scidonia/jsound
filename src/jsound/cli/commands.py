@@ -46,6 +46,11 @@ def check(
         None, "--counterexample-file", help="Save counterexample to file"
     ),
     verbose: bool = typer.Option(False, "--verbose", help="Enable verbose output"),
+    show_verification: bool = typer.Option(
+        False,
+        "--show-verification",
+        help="Show detailed verification conditions and Z3 constraints",
+    ),
 ) -> None:
     """Check if producer schema subsumes consumer schema."""
 
@@ -68,6 +73,7 @@ def check(
             max_array_len=max_array_length,
             max_recursion_depth=max_recursion_depth,
             ref_resolution_strategy=ref_resolution_strategy,
+            capture_verification_details=show_verification,
         )
 
         # Perform subsumption check
@@ -84,7 +90,7 @@ def check(
         elif output_format == "minimal":
             output_minimal(result)
         else:  # pretty
-            output_pretty(result, verbose)
+            output_pretty(result, verbose, show_verification)
 
         # Save counterexample if requested
         if counterexample_file and result.counterexample:
@@ -157,18 +163,72 @@ def output_minimal(result: CheckResult) -> None:
             print(json.dumps(result.counterexample))
 
 
-def output_pretty(result: CheckResult, verbose: bool = False) -> None:
+def output_pretty(
+    result: CheckResult, verbose: bool = False, show_verification: bool = False
+) -> None:
     """Output result in pretty format."""
+
+    # Show verification details if requested
+    if show_verification:
+        rprint("\n[bold blue]🔍 Verification Process[/bold blue]")
+        rprint("[dim]Checking if Producer schema ⊆ Consumer schema[/dim]")
+        rprint("[dim]This means: ∀x. Producer(x) → Consumer(x)[/dim]")
+        rprint("[dim]We check satisfiability of: Producer(x) ∧ ¬Consumer(x)[/dim]")
+
+        if hasattr(result, "producer_constraints") and result.producer_constraints:
+            rprint(f"\n[cyan]Producer constraints (P):[/cyan]")
+            rprint(f"[dim]{result.producer_constraints}[/dim]")
+            human_p = _explain_constraint(result.producer_constraints)
+            if human_p:
+                rprint(f"[dim]→ {human_p}[/dim]")
+
+        if hasattr(result, "consumer_constraints") and result.consumer_constraints:
+            rprint(f"\n[cyan]Consumer constraints (C):[/cyan]")
+            rprint(f"[dim]{result.consumer_constraints}[/dim]")
+            human_c = _explain_constraint(result.consumer_constraints)
+            if human_c:
+                rprint(f"[dim]→ {human_c}[/dim]")
+
+        if hasattr(result, "verification_formula") and result.verification_formula:
+            rprint(f"\n[yellow]Verification formula (P ∧ ¬C):[/yellow]")
+            rprint(f"[dim]Looking for values that satisfy P but violate C[/dim]")
+
+        rprint("")
+
+    # Show main result
     if result.is_compatible:
         rprint("[green]✓ Schemas are compatible[/green]")
         rprint("Producer schema [blue]⊆[/blue] Consumer schema")
+
+        if show_verification:
+            rprint("\n[green]📋 Verification result: UNSAT[/green]")
+            rprint("[dim]No counterexample exists - subsumption holds![/dim]")
     else:
         rprint("[red]✗ Schemas are incompatible[/red]")
-        rprint("Found counterexample that satisfies producer but violates consumer:")
 
-        if result.counterexample:
+        if result.error_message:
+            rprint(f"[red]Error during verification: {result.error_message}[/red]")
+        elif result.counterexample:
+            rprint(
+                "Found counterexample that satisfies producer but violates consumer:"
+            )
             rprint("\n[yellow]Counterexample:[/yellow]")
             rprint(json.dumps(result.counterexample, indent=2))
+        else:
+            rprint(
+                "Found counterexample that satisfies producer but violates consumer:"
+            )
+            rprint(
+                "[yellow]⚠️  No counterexample was extracted (this might be a bug)[/yellow]"
+            )
+
+        if show_verification:
+            rprint("\n[red]📋 Verification result: SAT[/red]")
+            rprint("[dim]Found a witness that satisfies P but violates C[/dim]")
+
+            if hasattr(result, "z3_model") and result.z3_model:
+                rprint(f"\n[yellow]Z3 Model (raw):[/yellow]")
+                rprint(f"[dim]{result.z3_model}[/dim]")
 
     if verbose and result.solver_time:
         rprint(f"\n[dim]Solver time: {result.solver_time:.3f}s[/dim]")
@@ -178,6 +238,46 @@ def save_counterexample(counterexample: dict, file_path: Path) -> None:
     """Save counterexample to file."""
     with open(file_path, "w") as f:
         json.dump(counterexample, f, indent=2)
+
+
+def _format_z3_constraint(constraint_str: str) -> str:
+    """Format Z3 constraint string for better readability."""
+    if not constraint_str:
+        return constraint_str
+
+    # Keep constraints relatively compact but readable
+    # Replace some common patterns for readability
+    formatted = constraint_str.replace("And(", "And(\n    ")
+    formatted = formatted.replace("Or(", "Or(\n    ")
+    formatted = formatted.replace("Implies(", "Implies(\n    ")
+
+    # Limit to reasonable length to avoid overwhelming output
+    if len(formatted) > 500:
+        return constraint_str[:500] + "..."
+
+    return formatted
+
+
+def _explain_constraint(constraint_str: str) -> str:
+    """Provide human-readable explanation of Z3 constraints."""
+    if not constraint_str:
+        return ""
+
+    # Simple pattern matching for common constraint types
+    if "Or(is(str, x), Or(is(int, x), is(real, x)))" in constraint_str:
+        return "Accepts strings, integers, or numbers"
+    elif "is(str, x)" in constraint_str and constraint_str.count("is(") == 1:
+        return "Must be a string"
+    elif "is(int, x)" in constraint_str and constraint_str.count("is(") == 1:
+        return "Must be an integer"
+    elif "is(obj, x)" in constraint_str and "has(x," in constraint_str:
+        return "Must be an object with required properties"
+    elif "Or(" in constraint_str and "is(" in constraint_str:
+        return "Accepts multiple types"
+    elif "And(" in constraint_str:
+        return "Must satisfy all conditions"
+
+    return ""  # Return empty string if we can't explain it simply
 
 
 if __name__ == "__main__":
