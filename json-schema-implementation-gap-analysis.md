@@ -1,6 +1,6 @@
 # JSON Schema Implementation Gap Analysis
 
-**JSSound Subsumption Checker - Draft 2020-12 Compliance Assessment**
+**jSound Subsumption Checker - Draft 2020-12 Compliance Assessment**
 
 *Last Updated: 2025-01-17*
 
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This document provides a comprehensive assessment of JSON Schema Draft 2020-12 feature implementation status in the JSSound subsumption checker. Through recent development work, our implementation now covers approximately **90-92% of common JSON Schema usage**, with significant improvements in conditionals, format validation, and logical negation.
+This document provides a comprehensive assessment of JSON Schema Draft 2020-12 feature implementation status in the jSound subsumption checker. Through recent development work, our implementation now covers approximately **90-92% of common JSON Schema usage**, with significant improvements in conditionals, format validation, and logical negation.
 
 **Current Test Results**: 99%+ success rate (125+/130+ tests passing, including new contains tests)
 

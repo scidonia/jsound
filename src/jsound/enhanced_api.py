@@ -1,4 +1,4 @@
-"""Enhanced JSSound API with detailed explanations."""
+"""Enhanced jSound API with detailed explanations."""
 
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
@@ -28,7 +28,7 @@ class EnhancedSubsumptionResult:
 
 
 class EnhancedJSoundAPI:
-    """Enhanced JSSound API with detailed failure explanations."""
+    """Enhanced jSound API with detailed failure explanations."""
 
     def __init__(self, **kwargs):
         self.base_api = JSoundAPI(**kwargs)

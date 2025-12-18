@@ -1,8 +1,29 @@
 [project]
 name = "jsound"
 version = "0.1.0"
-description = "JSON Schema subsumption checker using Z3 SMT solver"
+description = "jSound - JSON Schema subsumption checker using Z3 SMT solver with enhanced explanations"
 readme = "README.md"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Gavin Mendel-Gleason", email = "gavin@scidonia.com"}
+]
+maintainers = [
+    {name = "Scidonia Limited", email = "info@scidonia.com"}
+]
+keywords = ["json-schema", "smt", "z3", "subsumption", "api-compatibility", "schema-validation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Code Generators",
+]
 requires-python = ">=3.12"
 dependencies = [
     "z3-solver>=4.12.0",
@@ -10,7 +31,6 @@ dependencies = [
     "jsonschema>=4.20.0",
     "pydantic>=2.5.0",
     "rich>=13.7.0",
-    "pytest>=9.0.2",
 ]
 
 [build-system]
@@ -28,6 +48,13 @@ dev = [
     "mypy>=1.6.0",
     "ruff>=0.1.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/scidonia/jsound"
+Documentation = "https://github.com/scidonia/jsound/blob/main/README.md"
+Repository = "https://github.com/scidonia/jsound"
+Issues = "https://github.com/scidonia/jsound/issues"
+"Company" = "https://bookwyrm.ai"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,7 +1,7 @@
 {
   "title": "Payment Form (Strict Dependencies)",
   "description": "Consumer schema requiring billing info when credit card is used",
-  "type": "object", 
+  "type": "object",
   "properties": {
     "payment_method": {
       "type": "string",
@@ -15,7 +15,7 @@
       "type": "object",
       "properties": {
         "street": {"type": "string"},
-        "city": {"type": "string"}, 
+        "city": {"type": "string"},
         "zip": {"type": "string"}
       },
       "required": ["street", "city", "zip"]

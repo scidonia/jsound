@@ -1,44 +1,84 @@
-# JSond - JSON Schema Subsumption Checker
+# jSound - JSON Schema Subsumption Checker
 
-JSond is a tool that checks **JSON Schema subsumption** using Z3 SMT solver. It determines whether one JSON schema is compatible with another by checking if the producer schema is a subset of the consumer schema.
+jSound is a tool that checks **JSON Schema subsumption** using Z3 SMT solver. It determines whether one JSON schema is compatible with another by checking if the producer schema is a subset of the consumer schema.
 
 ## 🎯 What is Schema Subsumption?
 
 Given two JSON schemas P (producer) and C (consumer), we say **P ⊆ C** (P subsumes C) if every JSON document that validates against P also validates against C. 
 
-JSond checks this by solving: **P ∧ ¬C is UNSAT**
+jSound checks this by solving: **P ∧ ¬C is UNSAT**
 - If **UNSAT**: Schemas are compatible (P ⊆ C)  
-- If **SAT**: Schemas are incompatible, and JSond provides a counterexample
+- If **SAT**: Schemas are incompatible, and jSound provides a counterexample
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - Python 3.12+
-- Nix (for Z3 library dependencies)
-- uv (for dependency management)
+- Z3 SMT solver library (see installation options below)
 
-### Installation
+### Installation Options
 
-1. Clone the repository:
+#### Option 1: Install from PyPI (Recommended)
+
+```bash
+# Install directly from PyPI
+pip install jsound
+
+# Or using pipx for isolated installation
+pipx install jsound
+```
+
+#### Option 2: Install from Source
+
 ```bash
 git clone <repository-url>
 cd jsound
+pip install .
 ```
 
-2. Set up the environment:
+#### Option 3: Development Setup with Nix/uv
+
 ```bash
+git clone <repository-url>
+cd jsound
 direnv allow  # Sets up Nix environment with Z3
 uv sync       # Install Python dependencies
 ```
 
-3. Run JSond:
+### Z3 Solver Installation
+
+jSound requires the Z3 SMT solver library. Install it using your system package manager:
+
+**Ubuntu/Debian:**
 ```bash
-# Using the convenient wrapper script
+sudo apt-get install libz3-dev z3
+```
+
+**macOS (Homebrew):**
+```bash
+brew install z3
+```
+
+**Windows:**
+- Download from [Z3 releases](https://github.com/Z3Prover/z3/releases)
+- Or use conda: `conda install -c conda-forge z3`
+
+**Python z3-solver package:**
+```bash
+pip install z3-solver
+```
+
+### Usage
+
+```bash
+# After pip/pipx installation
+jsound producer_schema.json consumer_schema.json
+
+# From source with development setup  
 ./jsound producer_schema.json consumer_schema.json
 
-# Or with uv directly (need to set Z3 library path)
-export LD_LIBRARY_PATH=/nix/store/5z32bk36clikx62822is7rx80s61y7r5-z3-4.15.4-lib/lib:$LD_LIBRARY_PATH
+# Or with uv (development)
 uv run jsound producer_schema.json consumer_schema.json
 ```
 
@@ -48,9 +88,12 @@ uv run jsound producer_schema.json consumer_schema.json
 
 ```bash
 # Check if producer schema is compatible with consumer schema
+jsound examples/producer.json examples/consumer.json
+
+# With development setup
 ./jsound examples/producer.json examples/consumer.json
 
-# Or using uv run (with Z3 library path)
+# With uv (development)
 uv run jsound examples/producer.json examples/consumer.json
 ```
 
@@ -77,7 +120,7 @@ Output: `✗ Schemas are incompatible` (with counterexample)
 ### Command Line Options
 
 ```bash
-./jsound [OPTIONS] PRODUCER_SCHEMA_FILE CONSUMER_SCHEMA_FILE
+jsound [OPTIONS] PRODUCER_SCHEMA_FILE CONSUMER_SCHEMA_FILE
 
 Options:
   --max-array-length INTEGER     Maximum array length for bounds [default: 50]
@@ -86,6 +129,7 @@ Options:
   --output-format TEXT           Output format: json, pretty, or minimal [default: pretty]
   --counterexample-file PATH     Save counterexample to file
   --verbose                      Enable verbose output
+  --explanations                 Enable enhanced explanations for incompatibilities
 ```
 
 ### Output Formats
@@ -118,9 +162,37 @@ compatible
 - `1`: Schemas are incompatible  
 - `2`: Error (invalid schema, timeout, etc.)
 
+### Enhanced Explanations
+
+jSound provides detailed explanations for schema incompatibilities with the `--explanations` flag:
+
+```bash
+jsound --explanations producer.json consumer.json
+```
+
+**Example enhanced output:**
+```
+✗ Schemas are incompatible
+
+Counterexample: {"priority": "critical", "status": "active"}
+
+Explanation: Property 'priority' enum mismatch: producer allows ['critical', 'urgent'] not in consumer enum ['low', 'medium', 'high'] | Property 'status' const mismatch: producer requires 'active', consumer requires 'enabled'
+
+Failed Constraints: ['enum_mismatch:priority', 'const:status:active→enabled']
+
+Recommendations: ["Remove ['critical', 'urgent'] from property 'priority' enum or expand consumer enum", "Change property 'status' const from 'active' to 'enabled'"]
+```
+
+**Features:**
+- **Specific violation detection**: Identifies exactly which constraints fail
+- **Property-level analysis**: Shows which object properties cause incompatibilities  
+- **Actionable recommendations**: Concrete steps to fix schema mismatches
+- **Constraint labeling**: Clear labels for failed constraints (e.g., `enum_mismatch:priority`)
+- **Real counterexamples**: Meaningful JSON values that demonstrate incompatibility
+
 ## 🔧 Architecture
 
-JSond implements the specification in `json-schema-to-z3-spec.md` with these key components:
+jSound implements the specification in `json-schema-to-z3-spec.md` with these key components:
 
 ### Core Components
 
@@ -146,18 +218,24 @@ JSond implements the specification in `json-schema-to-z3-spec.md` with these key
 ### Supported JSON Schema Features
 
 **✅ Currently Supported:**
-- Basic types: `null`, `boolean`, `integer`, `number`, `string`, `array`, `object`
-- Constants: `const`, `enum`
-- Boolean composition: `allOf`, `anyOf`, `oneOf`, `not`
-- Type unions: `"type": ["string", "number"]`
+- **Basic types**: `null`, `boolean`, `integer`, `number`, `string`, `array`, `object`
+- **Constants**: `const`, `enum` with enhanced mismatch explanations
+- **Boolean composition**: `allOf`, `anyOf`, `oneOf`, `not`
+- **Type unions**: `"type": ["string", "number"]`
+- **Object properties**: `properties`, `required`, `additionalProperties`, `patternProperties`
+- **Array constraints**: `items`, `minItems`, `maxItems`, `contains`, `uniqueItems`
+- **String constraints**: `minLength`, `maxLength`, `pattern`, `format`
+- **Number constraints**: `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf`
+- **Dependencies**: `dependentRequired`, `dependentSchemas`, `dependencies` (legacy)
+- **Conditionals**: Basic `if`/`then`/`else` support
+- **References**: `$ref` with bounded unrolling
+- **Enhanced explanations**: Detailed failure analysis with actionable recommendations
 
-**🚧 Planned:**
-- Object properties: `properties`, `required`, `additionalProperties`
-- Array constraints: `items`, `minItems`, `maxItems`
-- String constraints: `minLength`, `maxLength`, `pattern`
-- Number constraints: `minimum`, `maximum`, `multipleOf`
-- Conditionals: `if`/`then`/`else`
-- References: `$ref` with bounded unrolling
+**🚧 Advanced Features (Lower Priority):**
+- Complex conditionals and nested `if`/`then`/`else`
+- `unevaluatedProperties`, `unevaluatedItems`
+- `contentEncoding`, `contentMediaType`
+- `propertyNames` validation
 
 ## 🧪 Examples
 
@@ -217,6 +295,40 @@ Result: **Compatible** ✅ (producer messages will always validate against consu
 
 Result: **Incompatible** ❌ (counterexample: any string or number)
 
+### Programmatic Usage
+
+jSound can also be used as a Python library:
+
+```python
+from jsound.api import JSoundAPI
+
+# Initialize the API
+api = JSoundAPI()
+
+# Check subsumption
+result = api.check_subsumption(producer_schema, consumer_schema)
+
+if result.is_compatible:
+    print("✓ Schemas are compatible")
+else:
+    print(f"✗ Incompatible: {result.explanation}")
+    print(f"Counterexample: {result.counterexample}")
+    print(f"Recommendations: {result.recommendations}")
+```
+
+**Enhanced API usage:**
+```python
+from jsound.enhanced_api import JSoundEnhancedAPI
+
+# Enable enhanced explanations
+api = JSoundEnhancedAPI(explanations=True)
+result = api.check_subsumption(producer_schema, consumer_schema)
+
+# Access detailed analysis
+print(f"Failed constraints: {result.failed_constraints}")
+print(f"Solver time: {result.solver_time}s")
+```
+
 ## 🏗️ Development
 
 ### Project Structure
@@ -242,15 +354,39 @@ src/jsound/
 
 ### Running Tests
 
-```bash
-# Test Z3 integration
-python test_z3.py
+jSound has comprehensive test coverage (99.3%) across all features:
 
-# Test full subsumption pipeline  
-python test_subsumption.py
+```bash
+# Run all tests
+pytest
+
+# Run specific test suites
+pytest tests/test_dependencies.py          # Dependency constraints
+pytest tests/test_const_enum_enhanced.py   # Const/enum explanations
+pytest tests/test_pattern_properties.py    # Pattern properties
+pytest tests/test_unique_items.py          # Array uniqueness
+pytest tests/test_oneof.py                 # OneOf constraints
 
 # Test CLI functionality
-./jsound examples/producer.json examples/consumer.json
+jsound examples/producer.json examples/consumer.json
+
+# Test enhanced explanations
+jsound --explanations examples/ecommerce_product_v1.json examples/ecommerce_product_v2_breaking.json
+```
+
+### Example Test Output
+
+```bash
+$ pytest -v
+============================= test session starts ==============================
+collecting ... collected 89 items
+
+tests/test_dependencies.py::TestDependencies::test_dependent_required_basic PASSED
+tests/test_const_enum_enhanced.py::TestConstEnumEnhanced::test_const_mismatch PASSED
+tests/test_pattern_properties.py::TestPatternProperties::test_pattern_mismatch PASSED
+...
+
+============================== 89 passed in 2.34s ==============================
 ```
 
 ### Configuration
@@ -263,7 +399,7 @@ Default bounds can be adjusted via CLI options:
 
 ## 🎓 Theory
 
-JSond implements the **JSON Schema → SMT** translation specified in `json-schema-to-z3-spec.md`. Key theoretical foundations:
+jSound implements the **JSON Schema → SMT** translation specified in `json-schema-to-z3-spec.md`. Key theoretical foundations:
 
 1. **Finite Model Property**: Uses bounded arrays and finite key universes to ensure decidability
 2. **Tagged Union Encoding**: JSON values encoded as Z3 algebraic datatypes  
@@ -280,21 +416,46 @@ JSond implements the **JSON Schema → SMT** translation specified in `json-sche
 
 ## 📝 License
 
-[License information here]
+Copyright 2024 Scidonia Limited
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 ## 🙋 FAQ
 
 **Q: What JSON Schema version is supported?**
-A: JSond targets JSON Schema Draft 2019-09 core features, with focus on practical subset for API compatibility checking.
+A: jSound targets JSON Schema Draft 2019-09 core features, with focus on practical subset for API compatibility checking.
 
-**Q: How does JSond handle infinite schemas?**
-A: JSond uses finite bounds (configurable array lengths, recursion depth) to ensure termination while maintaining soundness within those bounds.
+**Q: How does jSound handle infinite schemas?**
+A: jSound uses finite bounds (configurable array lengths, recursion depth) to ensure termination while maintaining soundness within those bounds.
 
-**Q: Can I use JSond in CI/CD pipelines?**  
-A: Yes! JSond provides machine-readable JSON output and meaningful exit codes perfect for automated workflows.
+**Q: Can I use jSound in CI/CD pipelines?**  
+A: Yes! jSound provides machine-readable JSON output and meaningful exit codes perfect for automated workflows.
 
 **Q: What happens if Z3 times out?**
-A: JSond reports the timeout as an error with exit code 2. Increase `--timeout` or simplify schemas.
+A: jSound reports the timeout as an error with exit code 2. Increase `--timeout` or simplify schemas.
 
 **Q: How accurate are the counterexamples?**
 A: Counterexamples are guaranteed to satisfy the producer schema but violate the consumer schema, providing concrete evidence of incompatibility.
+
+**Q: I'm getting "Z3 library not found" errors. How do I fix this?**
+A: Make sure Z3 is properly installed:
+- Try `pip install z3-solver` for the Python package
+- On Linux: `sudo apt-get install libz3-dev z3`
+- On macOS: `brew install z3`  
+- Verify with: `python -c "import z3; print('Z3 working!')"`
+
+**Q: Does jSound work on Windows?**
+A: Yes! Install Z3 via conda (`conda install -c conda-forge z3`) or download from GitHub releases, then `pip install jsound`.
+
+**Q: What's the difference between the CLI and programmatic API?**
+A: The CLI is great for scripts and CI/CD. The programmatic API gives you structured access to results, enhanced explanations, and integration into Python applications.

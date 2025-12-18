@@ -1,6 +1,6 @@
-# JSSound Real-World Examples
+# jSound Real-World Examples
 
-This directory contains realistic JSON schema examples that demonstrate various schema evolution patterns and compatibility scenarios. JSSound now includes **enhanced explanations** that provide detailed insight into why schemas are incompatible and actionable recommendations for fixing them.
+This directory contains realistic JSON schema examples that demonstrate various schema evolution patterns and compatibility scenarios. jSound now includes **enhanced explanations** that provide detailed insight into why schemas are incompatible and actionable recommendations for fixing them.
 
 ## API Evolution Examples
 
@@ -26,7 +26,7 @@ This directory contains realistic JSON schema examples that demonstrate various 
 
 **Test:** `jsound ecommerce_product_v1.json ecommerce_product_v2_breaking.json`
 **Result:** ❌ Incompatible - Multiple breaking changes
-**Enhanced Explanation:** JSSound identifies specific constraint violations:
+**Enhanced Explanation:** jSound identifies specific constraint violations:
 - Required property `sku` missing from producer
 - String length constraints tightened (`name` minLength: 1→10, maxLength: 200→50)
 - Enum values restricted (`currency` supports EUR/GBP, consumer only accepts USD)
@@ -200,7 +200,7 @@ if not result.is_compatible:
 
 ## Enhanced Explanation Features
 
-JSSound now provides **comprehensive explanations** for schema incompatibilities:
+jSound now provides **comprehensive explanations** for schema incompatibilities:
 
 - **Meaningful Counterexamples**: Real JSON that demonstrates the incompatibility
 - **Constraint Identification**: Specific failed constraints clearly labeled
