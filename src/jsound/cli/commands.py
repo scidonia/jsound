@@ -89,6 +89,7 @@ def check(
             max_array_length=max_array_length,
             ref_resolution_strategy=ref_resolution_strategy,
             explanations=explanations,
+            capture_verification_details=show_verification,
         )
 
         if verbose:

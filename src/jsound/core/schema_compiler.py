@@ -477,6 +477,13 @@ class SchemaCompiler:
             )
             constraints.append(required_constraint)
 
+        # Handle patternProperties
+        if "patternProperties" in schema:
+            pattern_constraint = obj_builder.build_pattern_properties_constraints(
+                json_var, schema["patternProperties"], self.compile_schema
+            )
+            constraints.append(pattern_constraint)
+
         # Handle additionalProperties
         if "additionalProperties" in schema:
             additional_constraint = obj_builder.build_additional_properties_constraints(
@@ -782,6 +789,56 @@ class ObjectConstraintBuilder:
 
                 # has(j,k) → constraint (only for undeclared keys)
                 constraints.append(Implies(has_undeclared, additional_constraint))
+
+        if not constraints:
+            return BoolVal(True)
+        elif len(constraints) == 1:
+            return constraints[0]
+        else:
+            return And(*constraints)
+
+    def build_pattern_properties_constraints(
+        self, json_var, pattern_properties, compile_func
+    ):
+        """Build constraints for patternProperties.
+
+        Per JSON Schema spec: For each pattern P with schema SP:
+        ∀ k ∈ Keys: matches(k, P) ∧ has(j,k) → ⟦SP⟧(val(j,k))
+        """
+        import re
+
+        if not pattern_properties:
+            return BoolVal(True)
+
+        # Get object access functions
+        obj_functions = self.json_encoder.get_object_functions()
+        has_func = obj_functions["has"]
+        val_func = obj_functions["val"]
+
+        constraints = []
+
+        # For each pattern and its schema
+        for pattern, pattern_schema in pattern_properties.items():
+            # For each key in the key universe, check if it matches the pattern
+            for key in self.key_universe.keys:
+                try:
+                    if re.match(pattern, key):
+                        # This key matches the pattern
+                        key_literal = StringVal(key)
+                        has_property = has_func(json_var, key_literal)
+                        property_value = val_func(json_var, key_literal)
+
+                        # Compile the pattern schema constraint
+                        pattern_constraint = compile_func(
+                            pattern_schema, property_value
+                        )
+
+                        # has(j, k) → pattern_constraint (for matching keys)
+                        constraints.append(Implies(has_property, pattern_constraint))
+
+                except re.error:
+                    # Invalid regex pattern - skip silently
+                    pass
 
         if not constraints:
             return BoolVal(True)

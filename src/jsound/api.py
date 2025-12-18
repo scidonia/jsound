@@ -28,6 +28,12 @@ class SubsumptionResult:
     failed_constraints: Optional[list] = None
     recommendations: Optional[list] = None
 
+    # Verification detail fields for --show-verification
+    producer_constraints: Optional[str] = None
+    consumer_constraints: Optional[str] = None
+    verification_formula: Optional[str] = None
+    z3_model: Optional[str] = None
+
     def has_explanations(self) -> bool:
         """Check if detailed explanations are available."""
         return self.explanation is not None or bool(self.failed_constraints)
@@ -73,6 +79,7 @@ class JSoundAPI:
         max_array_length: int = 50,
         ref_resolution_strategy: str = "unfold",
         explanations: bool = True,
+        capture_verification_details: bool = False,
     ):
         """
         Initialize the JSO API.
@@ -82,11 +89,13 @@ class JSoundAPI:
             max_array_length: Maximum array length for bounds
             ref_resolution_strategy: 'unfold' (acyclic only) or 'simulation' (future)
             explanations: Enable detailed explanations for incompatibility (default: True)
+            capture_verification_details: Enable capture of detailed Z3 constraints for debugging
         """
         self.config = SolverConfig(
             timeout=timeout,
             max_array_len=max_array_length,
             ref_resolution_strategy=ref_resolution_strategy,
+            capture_verification_details=capture_verification_details,
         )
         self.explanations_enabled = explanations
 
@@ -118,6 +127,11 @@ class JSoundAPI:
                 counterexample=result.counterexample,
                 solver_time=result.solver_time,
                 error_message=result.error_message,
+                # Transfer verification details if captured
+                producer_constraints=getattr(result, "producer_constraints", None),
+                consumer_constraints=getattr(result, "consumer_constraints", None),
+                verification_formula=getattr(result, "verification_formula", None),
+                z3_model=getattr(result, "z3_model", None),
             )
 
             # Generate explanations if enabled and incompatible
@@ -344,6 +358,16 @@ class JSoundAPI:
                         f"Add format: '{cons_format}' to producer property '{prop_name}'"
                     )
 
+        # Check patternProperties conflicts
+        self._analyze_pattern_properties_failures(
+            producer,
+            consumer,
+            counterexample,
+            failed_constraints,
+            recommendations,
+            explanation_parts,
+        )
+
         # Check additionalProperties conflicts
         if consumer.get("additionalProperties") == False:
             consumer_props_set = set(consumer.get("properties", {}).keys())
@@ -356,6 +380,68 @@ class JSoundAPI:
                 )
 
         return explanation_parts
+
+    def _analyze_pattern_properties_failures(
+        self,
+        producer: Dict[str, Any],
+        consumer: Dict[str, Any],
+        counterexample: dict,
+        failed_constraints: list,
+        recommendations: list,
+        explanation_parts: list,
+    ) -> None:
+        """Analyze patternProperties schema failures."""
+        import re
+
+        producer_patterns = producer.get("patternProperties", {})
+        consumer_patterns = consumer.get("patternProperties", {})
+
+        # Check each property in the counterexample
+        for prop_name, prop_value in counterexample.items():
+            # Find patterns that match this property name
+            producer_matching_patterns = []
+            consumer_matching_patterns = []
+
+            for pattern in producer_patterns:
+                try:
+                    if re.match(pattern, prop_name):
+                        producer_matching_patterns.append(pattern)
+                except re.error:
+                    pass
+
+            for pattern in consumer_patterns:
+                try:
+                    if re.match(pattern, prop_name):
+                        consumer_matching_patterns.append(pattern)
+                except re.error:
+                    pass
+
+            # Check for type mismatches between matching patterns
+            for consumer_pattern in consumer_matching_patterns:
+                consumer_schema = consumer_patterns[consumer_pattern]
+
+                # Check if this property value violates the consumer pattern schema
+                if not self._element_satisfies_schema(prop_value, consumer_schema):
+                    # Find if there's a conflicting producer pattern
+                    for producer_pattern in producer_matching_patterns:
+                        producer_schema = producer_patterns[producer_pattern]
+
+                        if self._element_satisfies_schema(prop_value, producer_schema):
+                            # Found conflict: satisfies producer pattern but violates consumer pattern
+                            producer_type = producer_schema.get("type", "any")
+                            consumer_type = consumer_schema.get("type", "any")
+
+                            explanation_parts.append(
+                                f"Property '{prop_name}' matches pattern '{consumer_pattern}' but type mismatch: "
+                                f"producer pattern expects '{producer_type}', consumer pattern requires '{consumer_type}'"
+                            )
+                            failed_constraints.append(
+                                f"patternProperties:{consumer_pattern}:{producer_type}→{consumer_type}"
+                            )
+                            recommendations.append(
+                                f"Change producer pattern '{producer_pattern}' type from '{producer_type}' to '{consumer_type}'"
+                            )
+                            break
 
     def _element_satisfies_schema(self, element: Any, schema: Dict[str, Any]) -> bool:
         """Simple check if element satisfies schema (basic implementation)."""
