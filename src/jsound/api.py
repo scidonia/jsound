@@ -310,10 +310,44 @@ class JSoundAPI:
                         f"Add '{required_prop}' to producer's required properties"
                     )
 
+        # Check format constraint mismatches
+        producer_props = producer.get("properties", {})
+        consumer_props = consumer.get("properties", {})
+
+        for prop_name in counterexample.keys():
+            if prop_name in producer_props and prop_name in consumer_props:
+                prod_prop = producer_props[prop_name]
+                cons_prop = consumer_props[prop_name]
+
+                # Check format mismatches
+                prod_format = prod_prop.get("format")
+                cons_format = cons_prop.get("format")
+
+                if prod_format and cons_format and prod_format != cons_format:
+                    explanation_parts.append(
+                        f"Property '{prop_name}' format mismatch: producer has '{prod_format}', consumer requires '{cons_format}'"
+                    )
+                    failed_constraints.append(
+                        f"format:{prop_name}:{prod_format}→{cons_format}"
+                    )
+                    recommendations.append(
+                        f"Change producer property '{prop_name}' format from '{prod_format}' to '{cons_format}'"
+                    )
+                elif cons_format and not prod_format:
+                    explanation_parts.append(
+                        f"Property '{prop_name}' missing format constraint: consumer requires '{cons_format}'"
+                    )
+                    failed_constraints.append(
+                        f"format:{prop_name}:missing→{cons_format}"
+                    )
+                    recommendations.append(
+                        f"Add format: '{cons_format}' to producer property '{prop_name}'"
+                    )
+
         # Check additionalProperties conflicts
         if consumer.get("additionalProperties") == False:
-            consumer_props = set(consumer.get("properties", {}).keys())
-            extra_props = set(counterexample.keys()) - consumer_props
+            consumer_props_set = set(consumer.get("properties", {}).keys())
+            extra_props = set(counterexample.keys()) - consumer_props_set
             if extra_props:
                 explanation_parts.append(f"Extra properties not allowed: {extra_props}")
                 failed_constraints.append(f"additionalProperties:false")

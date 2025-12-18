@@ -162,9 +162,54 @@ class WitnessExtractor:
 
             result = {}
 
-            # Use key universe if available, otherwise fall back to common keys
+            # Prioritize schema-relevant keys to reduce clutter
             if self.key_universe:
-                keys_to_check = self.key_universe.get_key_list()
+                all_keys = self.key_universe.get_key_list()
+
+                # Prioritize actual property names over generic keys
+                schema_keys = [
+                    k
+                    for k in all_keys
+                    if k
+                    not in [
+                        "additional",
+                        "bar",
+                        "extra",
+                        "foo",
+                        "id",
+                        "info",
+                        "meta",
+                        "other",
+                        "prop",
+                        "sample",
+                        "temp",
+                        "test",
+                    ]
+                ]
+                generic_keys = [
+                    k
+                    for k in all_keys
+                    if k
+                    in [
+                        "additional",
+                        "bar",
+                        "extra",
+                        "foo",
+                        "id",
+                        "info",
+                        "meta",
+                        "other",
+                        "prop",
+                        "sample",
+                        "temp",
+                        "test",
+                    ]
+                ]
+
+                # Check schema keys first, then limit generic keys to reduce clutter
+                keys_to_check = (
+                    schema_keys + generic_keys[:2]
+                )  # Only first 2 generic keys
             else:
                 keys_to_check = [
                     "name",
