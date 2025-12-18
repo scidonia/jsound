@@ -10,6 +10,57 @@ jSound checks this by solving: **P ∧ ¬C is UNSAT**
 - If **UNSAT**: Schemas are compatible (P ⊆ C)
 - If **SAT**: Schemas are incompatible, and jSound provides a counterexample
 
+## 💡 Why Schema Subsumption?
+
+Schema subsumption checking solves critical problems in modern software development:
+
+### 🔄 **API Evolution & Versioning**
+- **Backward compatibility**: Ensure API v2 accepts all v1 requests
+- **Safe deployments**: Verify new schema versions don't break existing clients
+- **Contract testing**: Validate that service changes maintain compatibility guarantees
+
+### 🔗 **Producer/Consumer Validation**
+- **Microservices**: Ensure message producers generate data that consumers can process
+- **Data pipelines**: Verify upstream schemas are compatible with downstream processing
+- **Event streaming**: Validate Kafka producers/consumers maintain schema compatibility
+
+### 🗂️ **Database Schema Migration**
+- **Column changes**: Check if schema modifications preserve existing data validity
+- **Migration safety**: Ensure new constraints don't violate existing records
+- **NoSQL evolution**: Validate document schema changes in MongoDB, DocumentDB, etc.
+
+### 🎯 **Configuration Management**
+- **Config validation**: Ensure new config schemas accept all current configurations
+- **Environment promotion**: Verify dev/staging configs work in production schemas
+- **Feature flags**: Check if enabling features breaks existing config validation
+
+### 📊 **Data Integration & ETL**
+- **Source compatibility**: Validate data sources conform to processing pipeline requirements
+- **Format migration**: Ensure data format changes don't break downstream consumers
+- **Schema registry**: Maintain compatibility across schema versions in Confluent, etc.
+
+### 🧪 **Testing & Quality Assurance**
+- **Contract testing**: Verify API contracts between teams/services
+- **Test data validation**: Ensure test schemas generate valid production-compatible data
+- **Fuzz testing**: Validate that generated test data meets all schema requirements
+
+### 🏗️ **Build-Time Validation**
+- **CI/CD integration**: Catch schema incompatibilities before deployment
+- **Static analysis**: Validate JSON schemas at build time rather than runtime
+- **Dependency checking**: Ensure schema changes don't break dependent systems
+
+**Example Scenario:**
+```bash
+# Check if API v1 clients can work with v2 endpoints
+jsound api_v1_request.json api_v2_endpoint.json
+
+# Verify database migration safety  
+jsound existing_records_schema.json new_table_schema.json
+
+# Validate microservice compatibility
+jsound order_service_events.json payment_service_consumer.json
+```
+
 ## 🚀 Quick Start
 
 ### Prerequisites
