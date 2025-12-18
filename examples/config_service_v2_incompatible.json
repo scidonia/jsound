@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "properties": {
+    "service_name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "deployment": {
+      "type": "string",
+      "enum": ["staging", "production"]
+    },
+    "env_DATABASE_URL": {
+      "type": "number"
+    },
+    "timeout_request": {
+      "type": "string"
+    },
+    "feature_cache": {
+      "type": "string",
+      "enum": ["enabled", "disabled"]
+    }
+  },
+  "patternProperties": {
+    "^env_[A-Z_]+$": {
+      "type": "number",
+      "description": "Environment variables now expect numbers instead of strings"
+    },
+    "^timeout_[a-z]+$": {
+      "type": "string",
+      "description": "Timeout settings now expect strings instead of numbers"
+    },
+    "^feature_[a-z]+$": {
+      "type": "string",
+      "enum": ["enabled", "disabled"],
+      "description": "Feature flags now expect string enums instead of booleans"
+    }
+  },
+  "required": ["service_name", "version"],
+  "additionalProperties": false
+}

@@ -516,6 +516,16 @@ class JSoundAPI:
             explanation_parts,
         )
 
+        # Check dependency violations
+        self._analyze_dependency_failures(
+            producer,
+            consumer,
+            counterexample,
+            failed_constraints,
+            recommendations,
+            explanation_parts,
+        )
+
         # Check additionalProperties conflicts
         if consumer.get("additionalProperties") == False:
             consumer_props_set = set(consumer.get("properties", {}).keys())
@@ -629,6 +639,113 @@ class JSoundAPI:
                     recommendations.append(
                         f"Add uniqueItems: true to producer property '{prop_name}' or ensure array elements are unique"
                     )
+
+    def _analyze_dependency_failures(
+        self,
+        producer: Dict[str, Any],
+        consumer: Dict[str, Any],
+        counterexample: dict,
+        failed_constraints: list,
+        recommendations: list,
+        explanation_parts: list,
+    ) -> None:
+        """Analyze dependency violations in the counterexample."""
+
+        # Check dependentRequired violations
+        consumer_dep_req = consumer.get("dependentRequired", {})
+        if consumer_dep_req:
+            for trigger_prop, required_deps in consumer_dep_req.items():
+                if trigger_prop in counterexample:
+                    # Property exists, check if all dependencies are present
+                    missing_deps = []
+                    for dep_prop in required_deps:
+                        if dep_prop not in counterexample:
+                            missing_deps.append(dep_prop)
+
+                    if missing_deps:
+                        missing_str = ", ".join(f"'{dep}'" for dep in missing_deps)
+                        explanation_parts.append(
+                            f"Property '{trigger_prop}' requires {missing_str} but they are missing"
+                        )
+                        failed_constraints.append(
+                            f"dependentRequired:{trigger_prop}→{','.join(missing_deps)}"
+                        )
+                        recommendations.append(
+                            f"Add properties {missing_str} to producer schema when '{trigger_prop}' is present"
+                        )
+
+        # Check dependentSchemas violations
+        consumer_dep_schemas = consumer.get("dependentSchemas", {})
+        if consumer_dep_schemas:
+            for trigger_prop, dependent_schema in consumer_dep_schemas.items():
+                if trigger_prop in counterexample:
+                    # Property exists, check if object satisfies the dependent schema
+                    if not self._object_satisfies_schema(
+                        counterexample, dependent_schema
+                    ):
+                        schema_desc = self._describe_schema_constraint(dependent_schema)
+                        explanation_parts.append(
+                            f"Property '{trigger_prop}' requires object to satisfy schema {schema_desc}"
+                        )
+                        failed_constraints.append(f"dependentSchemas:{trigger_prop}")
+                        recommendations.append(
+                            f"Ensure producer satisfies dependent schema when '{trigger_prop}' is present"
+                        )
+
+        # Check legacy dependencies (Draft 7 format)
+        consumer_deps = consumer.get("dependencies", {})
+        if consumer_deps:
+            for trigger_prop, dependency in consumer_deps.items():
+                if trigger_prop in counterexample:
+                    if isinstance(dependency, list):
+                        # Property dependency (like dependentRequired)
+                        missing_deps = [
+                            dep for dep in dependency if dep not in counterexample
+                        ]
+                        if missing_deps:
+                            missing_str = ", ".join(f"'{dep}'" for dep in missing_deps)
+                            explanation_parts.append(
+                                f"Property '{trigger_prop}' requires {missing_str} but they are missing"
+                            )
+                            failed_constraints.append(
+                                f"dependencies:{trigger_prop}→{','.join(missing_deps)}"
+                            )
+                            recommendations.append(
+                                f"Add properties {missing_str} to producer schema when '{trigger_prop}' is present"
+                            )
+                    elif isinstance(dependency, dict):
+                        # Schema dependency (like dependentSchemas)
+                        if not self._object_satisfies_schema(
+                            counterexample, dependency
+                        ):
+                            schema_desc = self._describe_schema_constraint(dependency)
+                            explanation_parts.append(
+                                f"Property '{trigger_prop}' requires object to satisfy dependency schema {schema_desc}"
+                            )
+                            failed_constraints.append(f"dependencies:{trigger_prop}")
+                            recommendations.append(
+                                f"Ensure producer satisfies dependency schema when '{trigger_prop}' is present"
+                            )
+
+    def _object_satisfies_schema(self, obj: dict, schema: Dict[str, Any]) -> bool:
+        """Simple check if object satisfies schema constraints."""
+        # Check required properties
+        required = schema.get("required", [])
+        for prop in required:
+            if prop not in obj:
+                return False
+
+        # Check property schemas
+        properties = schema.get("properties", {})
+        for prop_name, prop_value in obj.items():
+            if prop_name in properties:
+                if not self._element_satisfies_schema(
+                    prop_value, properties[prop_name]
+                ):
+                    return False
+
+        # Basic checks - can be extended as needed
+        return True
 
     def _element_satisfies_schema(self, element: Any, schema: Dict[str, Any]) -> bool:
         """Simple check if element satisfies schema (basic implementation)."""

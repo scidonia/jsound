@@ -1,0 +1,45 @@
+{
+  "title": "Payment Form (Strict Dependencies)",
+  "description": "Consumer schema requiring billing info when credit card is used",
+  "type": "object", 
+  "properties": {
+    "payment_method": {
+      "type": "string",
+      "enum": ["credit_card", "paypal", "bank_transfer"]
+    },
+    "credit_card_number": {
+      "type": "string",
+      "pattern": "^[0-9]{13,19}$"
+    },
+    "billing_address": {
+      "type": "object",
+      "properties": {
+        "street": {"type": "string"},
+        "city": {"type": "string"}, 
+        "zip": {"type": "string"}
+      },
+      "required": ["street", "city", "zip"]
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    }
+  },
+  "required": ["payment_method"],
+  "dependentRequired": {
+    "credit_card_number": ["billing_address"],
+    "payment_method": ["email"]
+  },
+  "dependentSchemas": {
+    "payment_method": {
+      "if": {
+        "properties": {
+          "payment_method": {"const": "credit_card"}
+        }
+      },
+      "then": {
+        "required": ["credit_card_number"]
+      }
+    }
+  }
+}

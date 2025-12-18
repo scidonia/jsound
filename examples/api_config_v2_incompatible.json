@@ -1,0 +1,63 @@
+{
+  "title": "API Configuration (Strict Dependencies)",
+  "description": "Consumer schema requiring appropriate credentials for each auth type",
+  "type": "object",
+  "properties": {
+    "auth_type": {
+      "type": "string",
+      "enum": ["none", "basic", "bearer", "oauth2", "api_key"]
+    },
+    "api_key": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string"
+    },
+    "password": {
+      "type": "string"
+    },
+    "bearer_token": {
+      "type": "string"
+    },
+    "oauth2_client_id": {
+      "type": "string"
+    },
+    "oauth2_client_secret": {
+      "type": "string"
+    },
+    "oauth2_scope": {
+      "type": "string"
+    },
+    "base_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "timeout": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "required": ["auth_type", "base_url"],
+  "dependentSchemas": {
+    "auth_type": {
+      "anyOf": [
+        {
+          "if": {"properties": {"auth_type": {"const": "basic"}}},
+          "then": {"required": ["username", "password"]}
+        },
+        {
+          "if": {"properties": {"auth_type": {"const": "bearer"}}},
+          "then": {"required": ["bearer_token"]}
+        },
+        {
+          "if": {"properties": {"auth_type": {"const": "api_key"}}},
+          "then": {"required": ["api_key"]}
+        },
+        {
+          "if": {"properties": {"auth_type": {"const": "oauth2"}}},
+          "then": {"required": ["oauth2_client_id", "oauth2_client_secret"]}
+        }
+      ]
+    }
+  }
+}

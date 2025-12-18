@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "properties": {
+    "service_name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "env_DATABASE_URL": {
+      "type": "string"
+    },
+    "timeout_request": {
+      "type": "number",
+      "minimum": 0
+    },
+    "feature_cache": {
+      "type": "boolean"
+    }
+  },
+  "patternProperties": {
+    "^env_[A-Z_]+$": {
+      "type": "string",
+      "description": "Environment variables (uppercase with underscores)"
+    },
+    "^timeout_[a-z]+$": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Timeout settings in milliseconds"
+    },
+    "^feature_[a-z]+$": {
+      "type": "boolean",
+      "description": "Feature flags"
+    }
+  },
+  "required": ["service_name", "version"],
+  "additionalProperties": false
+}

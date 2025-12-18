@@ -1,0 +1,290 @@
+{
+  "title": "JSON Schema 'contains' Keyword Examples",
+  "description": "Real-world examples of the 'contains' keyword for array validation. The 'contains' keyword validates that at least one element in an array satisfies the given schema.",
+  
+  "examples": {
+    "basic_type_validation": {
+      "description": "Array must contain at least one string element",
+      "producer_schema": {
+        "type": "array",
+        "items": {"type": "string"}
+      },
+      "consumer_schema": {
+        "type": "array",
+        "contains": {"type": "string"}
+      },
+      "compatibility": "compatible",
+      "explanation": "Any array of strings will contain at least one string element"
+    },
+
+    "mixed_type_validation": {
+      "description": "Mixed array that might contain only numbers",
+      "producer_schema": {
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {"type": "string"},
+            {"type": "number"}
+          ]
+        }
+      },
+      "consumer_schema": {
+        "type": "array",
+        "contains": {"type": "string"}
+      },
+      "compatibility": "incompatible",
+      "explanation": "Mixed arrays may contain only numbers (like [1,2,3]), failing to satisfy the contains string constraint"
+    },
+
+    "guaranteed_mixed_validation": {
+      "description": "Array with guaranteed string element using allOf",
+      "producer_schema": {
+        "type": "array",
+        "allOf": [
+          {
+            "items": {
+              "anyOf": [
+                {"type": "string"},
+                {"type": "number"}
+              ]
+            }
+          },
+          {
+            "contains": {"type": "string"}
+          }
+        ]
+      },
+      "consumer_schema": {
+        "type": "array",
+        "contains": {"type": "string"}
+      },
+      "compatibility": "compatible",
+      "explanation": "Producer already requires contains string, so consumer constraint is satisfied"
+    },
+
+    "specific_value_validation": {
+      "description": "Array must contain the specific value 'admin'",
+      "producer_schema": {
+        "type": "array",
+        "items": {"const": "admin"}
+      },
+      "consumer_schema": {
+        "type": "array",
+        "contains": {"const": "admin"}
+      },
+      "compatibility": "compatible",
+      "explanation": "Array with only 'admin' values will always contain 'admin'"
+    },
+
+    "object_property_validation": {
+      "description": "Array must contain at least one object with status 'active'",
+      "producer_schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "status": {"const": "active"},
+            "name": {"type": "string"}
+          },
+          "required": ["status", "name"]
+        }
+      },
+      "consumer_schema": {
+        "type": "array",
+        "contains": {
+          "type": "object",
+          "properties": {
+            "status": {"const": "active"}
+          },
+          "required": ["status"]
+        }
+      },
+      "compatibility": "compatible",
+      "explanation": "All objects have status 'active', so array contains required object type"
+    },
+
+    "number_range_validation": {
+      "description": "Array must contain at least one number greater than 50",
+      "producer_schema": {
+        "type": "array",
+        "items": {
+          "type": "number",
+          "minimum": 50,
+          "maximum": 100
+        }
+      },
+      "consumer_schema": {
+        "type": "array",
+        "contains": {
+          "type": "number",
+          "minimum": 50
+        }
+      },
+      "compatibility": "compatible",
+      "explanation": "All array elements are >= 50, so contains constraint is always satisfied"
+    },
+
+    "empty_array_behavior": {
+      "description": "Empty arrays satisfy contains constraints (vacuous truth)",
+      "producer_schema": {
+        "type": "array",
+        "maxItems": 0
+      },
+      "consumer_schema": {
+        "type": "array",
+        "contains": {"type": "string"}
+      },
+      "compatibility": "compatible",
+      "explanation": "Per JSON Schema spec, 'contains' succeeds on empty arrays"
+    },
+
+    "incompatible_type_example": {
+      "description": "Number-only array cannot contain string elements",
+      "producer_schema": {
+        "type": "array",
+        "items": {"type": "number"}
+      },
+      "consumer_schema": {
+        "type": "array",
+        "contains": {"type": "string"}
+      },
+      "compatibility": "incompatible",
+      "explanation": "Arrays with only numbers cannot contain string elements"
+    },
+
+    "incompatible_value_example": {
+      "description": "Array with wrong constant value",
+      "producer_schema": {
+        "type": "array",
+        "items": {"const": "user"}
+      },
+      "consumer_schema": {
+        "type": "array",
+        "contains": {"const": "admin"}
+      },
+      "compatibility": "incompatible",
+      "explanation": "Array with only 'user' values cannot contain 'admin' value"
+    },
+
+    "incompatible_range_example": {
+      "description": "Number range that cannot satisfy minimum requirement",
+      "producer_schema": {
+        "type": "array",
+        "items": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        }
+      },
+      "consumer_schema": {
+        "type": "array",
+        "contains": {
+          "type": "number",
+          "minimum": 50
+        }
+      },
+      "compatibility": "incompatible", 
+      "explanation": "Range [0,10] cannot contain any number >= 50"
+    },
+
+    "complex_negation_example": {
+      "description": "Array must contain at least one non-boolean element",
+      "producer_schema": {
+        "type": "array",
+        "items": {"type": "string"}
+      },
+      "consumer_schema": {
+        "type": "array",
+        "contains": {
+          "not": {"type": "boolean"}
+        }
+      },
+      "compatibility": "compatible",
+      "explanation": "String elements are not boolean, satisfying the negation constraint"
+    }
+  },
+
+  "real_world_use_cases": {
+    "user_roles_validation": {
+      "description": "User list must contain at least one administrator",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "username": {"type": "string"},
+            "role": {"enum": ["admin", "user", "moderator"]}
+          }
+        },
+        "contains": {
+          "type": "object",
+          "properties": {
+            "role": {"const": "admin"}
+          }
+        }
+      },
+      "use_case": "Ensure administrative access is available"
+    },
+
+    "required_tag_validation": {
+      "description": "Article tags must include 'published'",
+      "schema": {
+        "type": "array",
+        "items": {"type": "string"},
+        "contains": {"const": "published"}
+      },
+      "use_case": "Validate that articles are marked as published"
+    },
+
+    "feature_flag_validation": {
+      "description": "Feature configuration must enable core features",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "feature": {"type": "string"},
+            "enabled": {"type": "boolean"}
+          }
+        },
+        "contains": {
+          "type": "object", 
+          "properties": {
+            "feature": {"const": "core_functionality"},
+            "enabled": {"const": true}
+          }
+        }
+      },
+      "use_case": "Ensure critical features are enabled in configuration"
+    },
+
+    "security_permission_validation": {
+      "description": "Permission array must include read access",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^(read|write|delete|admin)$"
+        },
+        "contains": {"const": "read"}
+      },
+      "use_case": "Ensure basic read permissions are granted"
+    }
+  },
+
+  "best_practices": [
+    "'contains' succeeds on empty arrays - use minItems if you need non-empty arrays",
+    "Use 'contains' with 'items' to specify both element types and required elements",
+    "'contains' requires only ONE matching element, not all elements",
+    "Combine with object schemas to validate specific property values",
+    "Use with 'not' keyword for exclusion patterns (must contain non-X elements)",
+    "'contains' is useful for validation that requires 'at least one' semantics"
+  ],
+
+  "implementation_notes": {
+    "z3_encoding": "Uses existential quantification over array indices with bounded unrolling",
+    "empty_array_behavior": "Encoded as implication: (is_array ∧ length > 0) → contains_constraint", 
+    "complexity": "O(MAX_ARRAY_LEN) constraints generated for bounded approach",
+    "interactions": "Works correctly with items, minItems, maxItems, and other array constraints"
+  }
+}

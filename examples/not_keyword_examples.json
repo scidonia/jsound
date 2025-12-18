@@ -1,0 +1,200 @@
+{
+  "title": "JSON Schema 'not' Keyword Examples",
+  "description": "Demonstrates the 'not' keyword for logical negation and exclusion constraints",
+  "examples": [
+    {
+      "name": "Empty String Exclusion",
+      "description": "Producer excludes empty strings, consumer requires non-empty strings",
+      "producer": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "allOf": [
+              {"type": "string"},
+              {"not": {"const": ""}}
+            ]
+          }
+        },
+        "required": ["username"]
+      },
+      "consumer": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string", 
+            "minLength": 1
+          }
+        },
+        "required": ["username"]
+      },
+      "expected": "compatible",
+      "rationale": "Producer excluding empty string subsumes consumer requiring non-empty string"
+    },
+    {
+      "name": "Type Exclusion Conflict", 
+      "description": "Producer excludes strings, consumer requires strings",
+      "producer": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "not": {"type": "string"}
+          }
+        },
+        "required": ["data"]
+      },
+      "consumer": {
+        "type": "object",
+        "properties": {
+          "data": {"type": "string"}
+        },
+        "required": ["data"]
+      },
+      "expected": "incompatible",
+      "rationale": "Producer excluding strings cannot provide strings required by consumer"
+    },
+    {
+      "name": "Enum Value Exclusion",
+      "description": "Producer excludes error status, consumer allows success status",
+      "producer": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {"type": "string"},
+              {"not": {"const": "error"}}
+            ]
+          }
+        },
+        "required": ["status"]
+      },
+      "consumer": {
+        "type": "object",
+        "properties": {
+          "status": {"const": "success"}
+        },
+        "required": ["status"]
+      },
+      "expected": "compatible",
+      "rationale": "Producer can provide 'success' since it only excludes 'error'"
+    },
+    {
+      "name": "Positive Numbers Only",
+      "description": "Producer provides positive integers, consumer excludes non-positive",
+      "producer": {
+        "type": "object",
+        "properties": {
+          "score": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": ["score"]
+      },
+      "consumer": {
+        "type": "object",
+        "properties": {
+          "score": {
+            "allOf": [
+              {"type": "integer"},
+              {"not": {"maximum": 0}}
+            ]
+          }
+        },
+        "required": ["score"]
+      },
+      "expected": "compatible", 
+      "rationale": "Positive integers satisfy the constraint of excluding non-positive integers"
+    },
+    {
+      "name": "Double Negation", 
+      "description": "Double negation should be equivalent to positive assertion",
+      "producer": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "not": {
+              "not": {"type": "string"}
+            }
+          }
+        },
+        "required": ["value"]
+      },
+      "consumer": {
+        "type": "object",
+        "properties": {
+          "value": {"type": "string"}
+        },
+        "required": ["value"]
+      },
+      "expected": "compatible",
+      "rationale": "NOT NOT string equals string"
+    },
+    {
+      "name": "Format Exclusion",
+      "description": "Producer with specific format, consumer excluding different format",
+      "producer": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": ["contact"]
+      },
+      "consumer": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "allOf": [
+              {"type": "string"},
+              {"not": {"format": "email"}}
+            ]
+          }
+        },
+        "required": ["contact"]
+      },
+      "expected": "compatible",
+      "rationale": "URI format strings don't match email format, satisfying the exclusion"
+    },
+    {
+      "name": "Complex Enum Exclusion",
+      "description": "Producer with high priority levels, consumer excluding low priorities", 
+      "producer": {
+        "type": "object",
+        "properties": {
+          "priority": {
+            "enum": ["high", "critical", "urgent"]
+          }
+        },
+        "required": ["priority"]
+      },
+      "consumer": {
+        "type": "object",
+        "properties": {
+          "priority": {
+            "allOf": [
+              {"type": "string"},
+              {"not": {"const": "low"}}
+            ]
+          }
+        },
+        "required": ["priority"]
+      },
+      "expected": "compatible",
+      "rationale": "High priority values don't include 'low', satisfying the exclusion constraint"
+    }
+  ],
+  "usage_patterns": {
+    "validation_exclusions": "Use 'not' to exclude invalid values (empty strings, error states)",
+    "type_constraints": "Combine 'not' with positive type constraints using 'allOf'",
+    "format_validation": "Use 'not' to exclude specific formats while allowing others", 
+    "business_rules": "Express business logic like 'cannot be in error state' or 'must not be zero'"
+  },
+  "best_practices": {
+    "combine_with_allof": "Always combine 'not' with positive constraints using 'allOf' for clarity",
+    "avoid_broad_exclusions": "Avoid using 'not' alone on types as it allows too many alternatives",
+    "double_negation": "Double negation (not not) equals positive assertion",
+    "test_edge_cases": "Always test boundary cases where exclusions might create unexpected results"
+  }
+}

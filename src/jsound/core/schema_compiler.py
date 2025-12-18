@@ -494,6 +494,33 @@ class SchemaCompiler:
             )
             constraints.append(additional_constraint)
 
+        # Handle dependentRequired (modern JSON Schema)
+        if "dependentRequired" in schema:
+            dependent_required_constraint = (
+                obj_builder.build_dependent_required_constraints(
+                    json_var, schema["dependentRequired"]
+                )
+            )
+            constraints.append(dependent_required_constraint)
+
+        # Handle dependentSchemas (modern JSON Schema)
+        if "dependentSchemas" in schema:
+            dependent_schemas_constraint = (
+                obj_builder.build_dependent_schemas_constraints(
+                    json_var, schema["dependentSchemas"], self.compile_schema
+                )
+            )
+            constraints.append(dependent_schemas_constraint)
+
+        # Handle legacy dependencies (Draft 7 and earlier)
+        if "dependencies" in schema:
+            legacy_dependencies_constraint = (
+                obj_builder.build_legacy_dependencies_constraints(
+                    json_var, schema["dependencies"], self.compile_schema
+                )
+            )
+            constraints.append(legacy_dependencies_constraint)
+
         # Combine all constraints
         if len(constraints) == 1:
             return constraints[0]
@@ -846,6 +873,127 @@ class ObjectConstraintBuilder:
                 except re.error:
                     # Invalid regex pattern - skip silently
                     pass
+
+        if not constraints:
+            return BoolVal(True)
+        elif len(constraints) == 1:
+            return constraints[0]
+        else:
+            return And(*constraints)
+
+    def build_dependent_required_constraints(self, json_var, dependent_required):
+        """Build constraints for dependentRequired.
+
+        Per JSON Schema spec: If property P exists, then properties D1,D2,... become required.
+        Logic: has(obj, P) → (has(obj, D1) ∧ has(obj, D2) ∧ ...)
+        """
+        if not dependent_required:
+            return BoolVal(True)
+
+        # Get object access functions
+        obj_functions = self.json_encoder.get_object_functions()
+        has_func = obj_functions["has"]
+
+        constraints = []
+
+        # For each property and its dependent required properties
+        for property_name, required_deps in dependent_required.items():
+            if not required_deps:  # Skip empty dependency lists
+                continue
+
+            # Create condition: has(obj, property_name)
+            prop_literal = StringVal(property_name)
+            has_property = has_func(json_var, prop_literal)
+
+            # Create consequence: all dependent properties must exist
+            dep_constraints = []
+            for dep_prop in required_deps:
+                dep_literal = StringVal(dep_prop)
+                has_dep = has_func(json_var, dep_literal)
+                dep_constraints.append(has_dep)
+
+            # Combine dependent constraints
+            if len(dep_constraints) == 1:
+                consequence = dep_constraints[0]
+            else:
+                consequence = And(*dep_constraints)
+
+            # Add implication: has(property) → (has(dep1) ∧ has(dep2) ∧ ...)
+            constraints.append(Implies(has_property, consequence))
+
+        if not constraints:
+            return BoolVal(True)
+        elif len(constraints) == 1:
+            return constraints[0]
+        else:
+            return And(*constraints)
+
+    def build_dependent_schemas_constraints(
+        self, json_var, dependent_schemas, compile_func
+    ):
+        """Build constraints for dependentSchemas.
+
+        Per JSON Schema spec: If property P exists, then the object must satisfy schema S.
+        Logic: has(obj, P) → schema_constraint
+        """
+        if not dependent_schemas:
+            return BoolVal(True)
+
+        # Get object access functions
+        obj_functions = self.json_encoder.get_object_functions()
+        has_func = obj_functions["has"]
+
+        constraints = []
+
+        # For each property and its dependent schema
+        for property_name, dependent_schema in dependent_schemas.items():
+            # Create condition: has(obj, property_name)
+            prop_literal = StringVal(property_name)
+            has_property = has_func(json_var, prop_literal)
+
+            # Compile the dependent schema
+            schema_constraint = compile_func(dependent_schema, json_var)
+
+            # Add implication: has(property) → schema_constraint
+            constraints.append(Implies(has_property, schema_constraint))
+
+        if not constraints:
+            return BoolVal(True)
+        elif len(constraints) == 1:
+            return constraints[0]
+        else:
+            return And(*constraints)
+
+    def build_legacy_dependencies_constraints(
+        self, json_var, dependencies, compile_func
+    ):
+        """Build constraints for legacy dependencies (Draft 7 and earlier).
+
+        Legacy dependencies can be either:
+        - Array of strings (property dependencies) → same as dependentRequired
+        - Schema object (schema dependencies) → same as dependentSchemas
+        """
+        if not dependencies:
+            return BoolVal(True)
+
+        constraints = []
+
+        for property_name, dependency in dependencies.items():
+            if isinstance(dependency, list):
+                # Property dependency - convert to dependentRequired format
+                dependent_required = {property_name: dependency}
+                constraint = self.build_dependent_required_constraints(
+                    json_var, dependent_required
+                )
+                constraints.append(constraint)
+
+            elif isinstance(dependency, dict):
+                # Schema dependency - convert to dependentSchemas format
+                dependent_schemas = {property_name: dependency}
+                constraint = self.build_dependent_schemas_constraints(
+                    json_var, dependent_schemas, compile_func
+                )
+                constraints.append(constraint)
 
         if not constraints:
             return BoolVal(True)

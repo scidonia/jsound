@@ -1,0 +1,41 @@
+{
+  "title": "API Configuration (Basic)",
+  "description": "Producer schema with basic API config",
+  "type": "object",
+  "properties": {
+    "auth_type": {
+      "type": "string",
+      "enum": ["none", "basic", "bearer", "oauth2", "api_key"]
+    },
+    "api_key": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string"
+    },
+    "password": {
+      "type": "string"
+    },
+    "bearer_token": {
+      "type": "string"
+    },
+    "oauth2_client_id": {
+      "type": "string"
+    },
+    "oauth2_client_secret": {
+      "type": "string"
+    },
+    "oauth2_scope": {
+      "type": "string"
+    },
+    "base_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "timeout": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "required": ["auth_type", "base_url"]
+}

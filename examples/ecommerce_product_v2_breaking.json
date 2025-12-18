@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 50
+    },
+    "price": {
+      "type": "number",
+      "minimum": 1.00,
+      "exclusiveMinimum": false
+    },
+    "currency": {
+      "type": "string",
+      "enum": ["USD"]
+    },
+    "category": {
+      "type": "string",
+      "enum": ["electronics", "clothing", "books"]
+    },
+    "in_stock": {
+      "type": "boolean"
+    },
+    "sku": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}-\\d{4}$"
+    }
+  },
+  "required": ["id", "name", "price", "currency", "in_stock", "sku"],
+  "additionalProperties": false
+}

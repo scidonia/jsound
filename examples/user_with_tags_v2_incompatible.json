@@ -1,0 +1,50 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 20
+    },
+    "email": {
+      "type": "string",
+      "format": "uri"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 3
+      },
+      "contains": {
+        "type": "string",
+        "enum": ["verified", "premium", "admin"]
+      },
+      "minItems": 2,
+      "maxItems": 5
+    },
+    "preferences": {
+      "type": "object",
+      "properties": {
+        "theme": {
+          "type": "string",
+          "enum": ["light"]
+        },
+        "notifications": {
+          "type": "boolean"
+        },
+        "language": {
+          "type": "string",
+          "enum": ["en", "fr", "es"]
+        }
+      },
+      "required": ["language"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["id", "username", "email", "tags", "preferences"],
+  "additionalProperties": false
+}

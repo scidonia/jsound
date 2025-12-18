@@ -1,6 +1,12 @@
 {
+  "title": "Database Configuration (Basic)",
+  "description": "Producer schema with basic database config",
   "type": "object",
   "properties": {
+    "database_type": {
+      "type": "string",
+      "enum": ["mysql", "postgresql", "sqlite", "redis"]
+    },
     "host": {
       "type": "string"
     },
@@ -9,16 +15,22 @@
       "minimum": 1,
       "maximum": 65535
     },
-    "database": {
-      "type": "string"
-    },
     "username": {
       "type": "string"
     },
     "password": {
       "type": "string"
+    },
+    "ssl_enabled": {
+      "type": "boolean"
+    },
+    "ssl_cert_path": {
+      "type": "string"
+    },
+    "connection_pool_size": {
+      "type": "integer",
+      "minimum": 1
     }
   },
-  "required": ["host", "port", "database", "username", "password"],
-  "additionalProperties": false
+  "required": ["database_type"]
 }

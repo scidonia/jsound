@@ -1,0 +1,28 @@
+{
+  "title": "Payment Form (Basic)",
+  "description": "Producer schema allowing payment without required billing info",
+  "type": "object",
+  "properties": {
+    "payment_method": {
+      "type": "string",
+      "enum": ["credit_card", "paypal", "bank_transfer"]
+    },
+    "credit_card_number": {
+      "type": "string",
+      "pattern": "^[0-9]{13,19}$"
+    },
+    "billing_address": {
+      "type": "object",
+      "properties": {
+        "street": {"type": "string"},
+        "city": {"type": "string"},
+        "zip": {"type": "string"}
+      }
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    }
+  },
+  "required": ["payment_method"]
+}

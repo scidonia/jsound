@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "properties": {
+    "service_name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "deployment": {
+      "type": "string",
+      "enum": ["staging", "production"]
+    },
+    "env_DATABASE_URL": {
+      "type": "string"
+    },
+    "timeout_request": {
+      "type": "number",
+      "minimum": 0
+    },
+    "feature_cache": {
+      "type": "boolean"
+    }
+  },
+  "patternProperties": {
+    "^env_[A-Z_]+$": {
+      "type": "string",
+      "description": "Environment variables (same type - compatible)"
+    },
+    "^timeout_[a-z]+$": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Timeout settings (same constraints - compatible)"
+    },
+    "^feature_[a-z]+$": {
+      "type": "boolean",
+      "description": "Feature flags (same type - compatible)"
+    }
+  },
+  "required": ["service_name", "version"],
+  "additionalProperties": true
+}

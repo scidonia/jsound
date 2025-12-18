@@ -1,0 +1,52 @@
+{
+  "title": "Database Configuration (Secure Dependencies)",
+  "description": "Consumer schema requiring credentials for network databases and SSL cert for SSL",
+  "type": "object",
+  "properties": {
+    "database_type": {
+      "type": "string", 
+      "enum": ["mysql", "postgresql", "sqlite", "redis"]
+    },
+    "host": {
+      "type": "string"
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "username": {
+      "type": "string"
+    },
+    "password": {
+      "type": "string"
+    },
+    "ssl_enabled": {
+      "type": "boolean"
+    },
+    "ssl_cert_path": {
+      "type": "string"
+    },
+    "connection_pool_size": {
+      "type": "integer", 
+      "minimum": 1
+    }
+  },
+  "required": ["database_type"],
+  "dependencies": {
+    "host": ["username", "password"],
+    "ssl_enabled": ["ssl_cert_path"]
+  },
+  "dependentSchemas": {
+    "database_type": {
+      "if": {
+        "properties": {
+          "database_type": {"enum": ["mysql", "postgresql"]}
+        }
+      },
+      "then": {
+        "required": ["host", "port"]
+      }
+    }
+  }
+}
