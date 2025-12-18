@@ -7,7 +7,7 @@ jSound is a tool that checks **JSON Schema subsumption** using Z3 SMT solver. It
 Given two JSON schemas P (producer) and C (consumer), we say **P ⊆ C** (P subsumes C) if every JSON document that validates against P also validates against C. 
 
 jSound checks this by solving: **P ∧ ¬C is UNSAT**
-- If **UNSAT**: Schemas are compatible (P ⊆ C)  
+- If **UNSAT**: Schemas are compatible (P ⊆ C)
 - If **SAT**: Schemas are incompatible, and jSound provides a counterexample
 
 ## 🚀 Quick Start
@@ -43,7 +43,6 @@ pip install .
 git clone <repository-url>
 cd jsound
 direnv allow  # Sets up Nix environment with Z3
-uv sync       # Install Python dependencies
 ```
 
 ### Z3 Solver Installation
@@ -75,9 +74,6 @@ pip install z3-solver
 # After pip/pipx installation
 jsound producer_schema.json consumer_schema.json
 
-# From source with development setup  
-./jsound producer_schema.json consumer_schema.json
-
 # Or with uv (development)
 uv run jsound producer_schema.json consumer_schema.json
 ```
@@ -90,9 +86,6 @@ uv run jsound producer_schema.json consumer_schema.json
 # Check if producer schema is compatible with consumer schema
 jsound examples/producer.json examples/consumer.json
 
-# With development setup
-./jsound examples/producer.json examples/consumer.json
-
 # With uv (development)
 uv run jsound examples/producer.json examples/consumer.json
 ```
@@ -102,7 +95,7 @@ uv run jsound examples/producer.json examples/consumer.json
 // producer.json - More restrictive
 {"type": "string", "minLength": 5}
 
-// consumer.json - Less restrictive  
+// consumer.json - Less restrictive
 {"type": "string"}
 ```
 Output: `✓ Schemas are compatible`
@@ -124,7 +117,7 @@ jsound [OPTIONS] PRODUCER_SCHEMA_FILE CONSUMER_SCHEMA_FILE
 
 Options:
   --max-array-length INTEGER     Maximum array length for bounds [default: 50]
-  --max-recursion-depth INTEGER  Maximum $ref unrolling depth [default: 3]  
+  --max-recursion-depth INTEGER  Maximum $ref unrolling depth [default: 3]
   --timeout INTEGER              Z3 solver timeout in seconds [default: 30]
   --output-format TEXT           Output format: json, pretty, or minimal [default: pretty]
   --counterexample-file PATH     Save counterexample to file
@@ -159,7 +152,7 @@ compatible
 ### Exit Codes
 
 - `0`: Schemas are compatible
-- `1`: Schemas are incompatible  
+- `1`: Schemas are incompatible
 - `2`: Error (invalid schema, timeout, etc.)
 
 ### Enhanced Explanations
@@ -185,7 +178,7 @@ Recommendations: ["Remove ['critical', 'urgent'] from property 'priority' enum o
 
 **Features:**
 - **Specific violation detection**: Identifies exactly which constraints fail
-- **Property-level analysis**: Shows which object properties cause incompatibilities  
+- **Property-level analysis**: Shows which object properties cause incompatibilities
 - **Actionable recommendations**: Concrete steps to fix schema mismatches
 - **Constraint labeling**: Clear labels for failed constraints (e.g., `enum_mismatch:priority`)
 - **Real counterexamples**: Meaningful JSON values that demonstrate incompatibility
@@ -201,7 +194,7 @@ jSound implements the specification in `json-schema-to-z3-spec.md` with these ke
    - Handles type predicates and mutual exclusion constraints
    - Manages finite key universes for objects
 
-2. **Schema Compiler** (`src/jsound/core/schema_compiler.py`)  
+2. **Schema Compiler** (`src/jsound/core/schema_compiler.py`)
    - Compiles JSON Schema keywords to Z3 predicates
    - Supports: `type`, `const`, `enum`, boolean composition (`allOf`, `anyOf`, `oneOf`, `not`)
    - Basic support for objects, arrays, strings, numbers
@@ -231,7 +224,7 @@ jSound implements the specification in `json-schema-to-z3-spec.md` with these ke
 - **References**: `$ref` with bounded unrolling
 - **Enhanced explanations**: Detailed failure analysis with actionable recommendations
 
-**🚧 Advanced Features (Lower Priority):**
+**🚧 Advanced Features (Not yet implemented):**
 - Complex conditionals and nested `if`/`then`/`else`
 - `unevaluatedProperties`, `unevaluatedItems`
 - `contentEncoding`, `contentMediaType`
@@ -256,7 +249,7 @@ jSound implements the specification in `json-schema-to-z3-spec.md` with these ke
 **Consumer (API v2):**
 ```json
 {
-  "type": "object", 
+  "type": "object",
   "properties": {
     "name": {"type": "string"},
     "age": {"type": "integer"}
@@ -288,7 +281,7 @@ Result: **Compatible** ✅ (producer messages will always validate against consu
 {"type": ["string", "number"]}
 ```
 
-**Consumer:**  
+**Consumer:**
 ```json
 {"type": "boolean"}
 ```
@@ -394,7 +387,7 @@ tests/test_pattern_properties.py::TestPatternProperties::test_pattern_mismatch P
 Default bounds can be adjusted via CLI options:
 
 - **Array bounds**: `--max-array-length` (default: 50)
-- **Recursion depth**: `--max-recursion-depth` (default: 3)  
+- **Recursion depth**: `--max-recursion-depth` (default: 3)
 - **Solver timeout**: `--timeout` (default: 30 seconds)
 
 ## 🎓 Theory
@@ -402,7 +395,7 @@ Default bounds can be adjusted via CLI options:
 jSound implements the **JSON Schema → SMT** translation specified in `json-schema-to-z3-spec.md`. Key theoretical foundations:
 
 1. **Finite Model Property**: Uses bounded arrays and finite key universes to ensure decidability
-2. **Tagged Union Encoding**: JSON values encoded as Z3 algebraic datatypes  
+2. **Tagged Union Encoding**: JSON values encoded as Z3 algebraic datatypes
 3. **Subsumption as Satisfiability**: P ⊆ C iff P ∧ ¬C is unsatisfiable
 4. **Counterexample Extraction**: SAT models converted back to concrete JSON instances
 
@@ -438,7 +431,7 @@ A: jSound targets JSON Schema Draft 2019-09 core features, with focus on practic
 **Q: How does jSound handle infinite schemas?**
 A: jSound uses finite bounds (configurable array lengths, recursion depth) to ensure termination while maintaining soundness within those bounds.
 
-**Q: Can I use jSound in CI/CD pipelines?**  
+**Q: Can I use jSound in CI/CD pipelines?**
 A: Yes! jSound provides machine-readable JSON output and meaningful exit codes perfect for automated workflows.
 
 **Q: What happens if Z3 times out?**
@@ -451,7 +444,7 @@ A: Counterexamples are guaranteed to satisfy the producer schema but violate the
 A: Make sure Z3 is properly installed:
 - Try `pip install z3-solver` for the Python package
 - On Linux: `sudo apt-get install libz3-dev z3`
-- On macOS: `brew install z3`  
+- On macOS: `brew install z3`
 - Verify with: `python -c "import z3; print('Z3 working!')"`
 
 **Q: Does jSound work on Windows?**
