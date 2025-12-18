@@ -529,6 +529,13 @@ class SchemaCompiler:
             )
             constraints.append(contains_constraint)
 
+        # Handle uniqueItems constraints
+        if schema.get("uniqueItems") is True:
+            unique_constraint = builder.build_unique_items_constraints(
+                json_var, self.json_encoder
+            )
+            constraints.append(unique_constraint)
+
         if not constraints:
             return BoolVal(True)
         elif len(constraints) == 1:
@@ -570,9 +577,9 @@ class SchemaCompiler:
             else:
                 int_constraints.append(int_val(json_var) <= IntVal(maximum))
         # Handle numeric exclusiveMinimum/exclusiveMaximum (JSON Schema Draft 6 style)
-        if exclusive_minimum is not None and exclusive_minimum is not True:
+        if exclusive_minimum is not None and not isinstance(exclusive_minimum, bool):
             int_constraints.append(int_val(json_var) > IntVal(exclusive_minimum))
-        if exclusive_maximum is not None and exclusive_maximum is not True:
+        if exclusive_maximum is not None and not isinstance(exclusive_maximum, bool):
             int_constraints.append(int_val(json_var) < IntVal(exclusive_maximum))
 
         if int_constraints:
@@ -598,9 +605,9 @@ class SchemaCompiler:
             else:
                 real_constraints.append(real_val(json_var) <= RealVal(maximum))
         # Handle numeric exclusiveMinimum/exclusiveMaximum (JSON Schema Draft 6 style)
-        if exclusive_minimum is not None and exclusive_minimum is not True:
+        if exclusive_minimum is not None and not isinstance(exclusive_minimum, bool):
             real_constraints.append(real_val(json_var) > RealVal(exclusive_minimum))
-        if exclusive_maximum is not None and exclusive_maximum is not True:
+        if exclusive_maximum is not None and not isinstance(exclusive_maximum, bool):
             real_constraints.append(real_val(json_var) < RealVal(exclusive_maximum))
 
         if real_constraints:
@@ -980,3 +987,54 @@ class ArrayConstraintBuilder:
         return Implies(
             And(is_arr(json_var), arr_len(json_var) > 0), contains_constraint
         )
+
+    def build_unique_items_constraints(self, json_var, json_encoder):
+        """Build uniqueItems constraints for arrays.
+
+        The 'uniqueItems' keyword validates that all elements in the array are unique.
+        This is implemented using pairwise inequality constraints:
+        ∀i,j ∈ [0, len-1]: i ≠ j → element[i] ≠ element[j]
+
+        Uses bounded approach with MAX_ARRAY_LEN limit.
+        """
+        MAX_ARRAY_LEN = 8  # Same as other array constraints
+
+        # Get array type predicate and accessors
+        type_predicates = json_encoder.create_type_predicates()
+        accessors = json_encoder.get_accessors()
+        is_arr = type_predicates["is_arr"]
+        arr_len = accessors["len"]
+
+        # Create external array elements function
+        json_sort = json_encoder.get_json_sort()
+        arr_elems = Function("arr_elems", json_sort, ArraySort(IntSort(), json_sort))
+
+        # Build pairwise inequality constraints
+        # For each pair of distinct indices i,j: if both are valid, then elements must be different
+        unique_constraints = []
+        for i in range(MAX_ARRAY_LEN):
+            for j in range(
+                i + 1, MAX_ARRAY_LEN
+            ):  # j > i to avoid redundant comparisons
+                element_i = Select(arr_elems(json_var), IntVal(i))
+                element_j = Select(arr_elems(json_var), IntVal(j))
+
+                # Both indices are within bounds
+                both_valid = And(
+                    IntVal(i) < arr_len(json_var), IntVal(j) < arr_len(json_var)
+                )
+
+                # Elements at these positions must be different
+                elements_different = element_i != element_j
+
+                unique_constraints.append(Implies(both_valid, elements_different))
+
+        # Apply uniqueness constraint only to arrays
+        if not unique_constraints:
+            return BoolVal(True)
+        elif len(unique_constraints) == 1:
+            constraint = unique_constraints[0]
+        else:
+            constraint = And(*unique_constraints)
+
+        return Implies(is_arr(json_var), constraint)

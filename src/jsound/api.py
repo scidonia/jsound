@@ -201,7 +201,14 @@ class JSoundAPI:
                     recommendations,
                 )
             )
-        else:
+
+        # Check for oneOf/anyOf specific failures
+        oneof_explanation = self._analyze_oneof_failure(
+            producer, consumer, counterexample, failed_constraints, recommendations
+        )
+        if oneof_explanation:
+            explanation_parts.extend(oneof_explanation)
+        elif not explanation_parts:
             explanation_parts.append(
                 f"Value {counterexample} satisfies producer but violates consumer"
             )
@@ -262,7 +269,138 @@ class JSoundAPI:
                 failed_constraints.append(f"minItems:{min_items}")
                 recommendations.append(f"Add minItems: {min_items} to producer schema")
 
+        # Check uniqueItems constraint violations
+        if consumer.get("uniqueItems") is True and not producer.get("uniqueItems"):
+            duplicates = self._find_duplicate_elements(counterexample)
+            if duplicates:
+                for element, indices in duplicates.items():
+                    indices_str = ", ".join(map(str, indices))
+                    explanation_parts.append(
+                        f"Array contains duplicate elements at indices {indices_str}: {repr(element)}"
+                    )
+                failed_constraints.append("uniqueItems:true")
+                recommendations.append(
+                    "Add uniqueItems: true to producer schema or ensure array elements are unique"
+                )
+
         return explanation_parts
+
+    def _find_duplicate_elements(self, array: list) -> dict:
+        """Find duplicate elements in array and return their indices.
+
+        Returns:
+            Dict mapping duplicate elements to list of their indices
+        """
+        element_indices = {}
+        duplicates = {}
+
+        for i, element in enumerate(array):
+            # Convert element to a hashable type for tracking
+            try:
+                key = (
+                    element
+                    if isinstance(element, (str, int, float, bool))
+                    else str(element)
+                )
+            except:
+                key = str(element)
+
+            if key not in element_indices:
+                element_indices[key] = []
+            element_indices[key].append(i)
+
+        # Find elements that appear more than once
+        for element, indices in element_indices.items():
+            if len(indices) > 1:
+                duplicates[element] = indices
+
+        return duplicates
+
+    def _analyze_oneof_failure(
+        self,
+        producer: Dict[str, Any],
+        consumer: Dict[str, Any],
+        counterexample: Any,
+        failed_constraints: list,
+        recommendations: list,
+    ) -> list:
+        """Analyze oneOf constraint failures."""
+        explanation_parts = []
+
+        # Check if either schema uses oneOf
+        producer_oneof = producer.get("oneOf")
+        consumer_oneof = consumer.get("oneOf")
+
+        if not (producer_oneof or consumer_oneof):
+            return explanation_parts
+
+        if producer_oneof and consumer_oneof:
+            # Both use oneOf - analyze which options match
+            producer_matches = self._find_matching_schemas(
+                counterexample, producer_oneof
+            )
+            consumer_matches = self._find_matching_schemas(
+                counterexample, consumer_oneof
+            )
+
+            if len(producer_matches) == 1 and len(consumer_matches) == 0:
+                explanation_parts.append(
+                    f"Value matches producer oneOf option {producer_matches[0]} but no consumer oneOf options"
+                )
+                failed_constraints.append(f"oneOf:no_consumer_match")
+                recommendations.append(
+                    "Add compatible schema option to consumer oneOf or modify producer oneOf"
+                )
+
+            elif len(producer_matches) == 1 and len(consumer_matches) > 1:
+                explanation_parts.append(
+                    f"Value matches producer oneOf option {producer_matches[0]} but multiple consumer oneOf options {consumer_matches} (violates exactly-one requirement)"
+                )
+                failed_constraints.append(f"oneOf:multiple_consumer_matches")
+                recommendations.append(
+                    "Make consumer oneOf options more specific to avoid multiple matches"
+                )
+
+            elif len(producer_matches) > 1:
+                explanation_parts.append(
+                    f"Value matches multiple producer oneOf options {producer_matches} (violates exactly-one requirement)"
+                )
+                failed_constraints.append(f"oneOf:multiple_producer_matches")
+                recommendations.append(
+                    "Make producer oneOf options more specific to avoid multiple matches"
+                )
+
+        elif consumer_oneof:
+            # Only consumer uses oneOf
+            consumer_matches = self._find_matching_schemas(
+                counterexample, consumer_oneof
+            )
+            if len(consumer_matches) == 0:
+                explanation_parts.append(
+                    f"Value doesn't match any consumer oneOf options"
+                )
+                failed_constraints.append("oneOf:no_match")
+                recommendations.append(
+                    "Add schema option to consumer oneOf that covers producer values"
+                )
+            elif len(consumer_matches) > 1:
+                explanation_parts.append(
+                    f"Value matches multiple consumer oneOf options {consumer_matches} (violates exactly-one requirement)"
+                )
+                failed_constraints.append("oneOf:multiple_matches")
+                recommendations.append(
+                    "Make consumer oneOf options more specific to avoid multiple matches"
+                )
+
+        return explanation_parts
+
+    def _find_matching_schemas(self, value: Any, schemas: list) -> list:
+        """Find which schemas in a oneOf/anyOf list match the given value."""
+        matches = []
+        for i, schema in enumerate(schemas):
+            if self._element_satisfies_schema(value, schema):
+                matches.append(i)
+        return matches
 
     def _analyze_contains_failure(
         self,
@@ -368,6 +506,16 @@ class JSoundAPI:
             explanation_parts,
         )
 
+        # Check uniqueItems conflicts for object properties that are arrays
+        self._analyze_object_unique_items_failures(
+            producer,
+            consumer,
+            counterexample,
+            failed_constraints,
+            recommendations,
+            explanation_parts,
+        )
+
         # Check additionalProperties conflicts
         if consumer.get("additionalProperties") == False:
             consumer_props_set = set(consumer.get("properties", {}).keys())
@@ -442,6 +590,45 @@ class JSoundAPI:
                                 f"Change producer pattern '{producer_pattern}' type from '{producer_type}' to '{consumer_type}'"
                             )
                             break
+
+    def _analyze_object_unique_items_failures(
+        self,
+        producer: Dict[str, Any],
+        consumer: Dict[str, Any],
+        counterexample: dict,
+        failed_constraints: list,
+        recommendations: list,
+        explanation_parts: list,
+    ) -> None:
+        """Analyze uniqueItems failures in object properties that are arrays."""
+        producer_props = producer.get("properties", {})
+        consumer_props = consumer.get("properties", {})
+
+        # Check each property in the counterexample
+        for prop_name, prop_value in counterexample.items():
+            if not isinstance(prop_value, list):
+                continue  # Skip non-array properties
+
+            # Check if this property has uniqueItems constraint in consumer but not producer
+            consumer_prop = consumer_props.get(prop_name, {})
+            producer_prop = producer_props.get(prop_name, {})
+
+            consumer_unique = consumer_prop.get("uniqueItems") is True
+            producer_unique = producer_prop.get("uniqueItems") is True
+
+            if consumer_unique and not producer_unique:
+                # Consumer requires unique items but producer allows duplicates
+                duplicates = self._find_duplicate_elements(prop_value)
+                if duplicates:
+                    for element, indices in duplicates.items():
+                        indices_str = ", ".join(map(str, indices))
+                        explanation_parts.append(
+                            f"Property '{prop_name}' contains duplicate elements at indices {indices_str}: {repr(element)}"
+                        )
+                    failed_constraints.append(f"uniqueItems:{prop_name}:true")
+                    recommendations.append(
+                        f"Add uniqueItems: true to producer property '{prop_name}' or ensure array elements are unique"
+                    )
 
     def _element_satisfies_schema(self, element: Any, schema: Dict[str, Any]) -> bool:
         """Simple check if element satisfies schema (basic implementation)."""
