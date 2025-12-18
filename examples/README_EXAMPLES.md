@@ -54,6 +54,21 @@ Recommendations: ["Add 'id' to producer's required properties", "Add 'preference
 
 **Pattern:** Demonstrates required field validation and port number constraints
 
+### Database Configuration with Dependencies (Incompatible)
+- **config_database_v1.json**: Basic database config without security dependencies
+- **config_database_v2_secure.json**: v2 with strict security dependencies
+
+**Test:** `jsound config_database_v1.json config_database_v2_secure.json`
+**Result:** ❌ Incompatible - Dependency violations
+**Enhanced Explanation:**
+```
+Counterexample: {'database_type': 'mysql', 'ssl_enabled': False}
+Explanation: Property 'ssl_enabled' requires 'ssl_cert_path' but they are missing
+Failed constraints: ['dependencies:ssl_enabled→ssl_cert_path']
+Recommendations: ["Add properties 'ssl_cert_path' to producer schema when 'ssl_enabled' is present"]
+```
+**Pattern:** Demonstrates legacy `dependencies` feature - when SSL is enabled, certificate path becomes required
+
 ## API Response Examples
 
 ### REST API Response
@@ -61,13 +76,38 @@ Recommendations: ["Add 'id' to producer's required properties", "Add 'preference
 
 **Pattern:** Shows use of anyOf for flexible response data types
 
+### API Configuration with Dependencies (Incompatible)
+- **api_config_v1.json**: Basic API config without authentication dependencies
+- **api_config_v2_incompatible.json**: v2 with strict authentication dependencies
+
+**Test:** `jsound api_config_v1.json api_config_v2_incompatible.json`
+**Result:** ❌ Incompatible - Complex dependency schema violations
+**Pattern:** Demonstrates `dependentSchemas` with conditional authentication requirements (basic auth → username/password, bearer → token, etc.)
+
+## Payment Form Examples
+
+### Payment Form with Dependencies (Incompatible)
+- **payment_form_v1.json**: Basic payment form without billing dependencies
+- **payment_form_v2_strict.json**: v2 with strict billing and email dependencies
+
+**Test:** `jsound payment_form_v1.json payment_form_v2_strict.json`
+**Result:** ❌ Incompatible - Multiple dependency violations
+**Enhanced Explanation:**
+```
+Counterexample: {'payment_method': 'credit_card'}
+Explanation: Property 'payment_method' requires 'email' but they are missing
+Failed constraints: ['dependentRequired:payment_method→email']
+Recommendations: ["Add properties 'email' to producer schema when 'payment_method' is present"]
+```
+**Pattern:** Demonstrates `dependentRequired` - when credit card info is provided, billing address becomes required
+
 ## Format Validation Examples
 
 ### Format Validation Schemas
 - **format_validation_producer.json**: Schema with email, URI, date-time, and date formats
 - **format_consumer_lenient.json**: Same structure but no format constraints (just strings)
 - **format_email_only.json**: Schema requiring email format
-- **format_different.json**: Schema requiring URI format  
+- **format_different.json**: Schema requiring URI format
 - **format_custom.json**: Schema with custom/unknown format
 
 **Test:** `jsound format_validation_producer.json format_consumer_lenient.json`
@@ -92,6 +132,18 @@ jsound examples/ecommerce_product_v1.json examples/ecommerce_product_v2_breaking
 # Test array constraint failures with explanations
 jsound examples/user_with_tags_v1.json examples/user_with_tags_v2_incompatible.json
 # Result: ❌ Incompatible with counterexample and specific failed constraints
+
+# Test payment form dependencies with explanations
+jsound examples/payment_form_v1.json examples/payment_form_v2_strict.json
+# Result: ❌ Incompatible with dependency violation explanation
+
+# Test database security dependencies
+jsound examples/config_database_v1.json examples/config_database_v2_secure.json
+# Result: ❌ Incompatible with security dependency violations
+
+# Test API authentication dependencies
+jsound examples/api_config_v1.json examples/api_config_v2_incompatible.json
+# Result: ❌ Incompatible with authentication dependency violations
 
 # Test format validation compatibility
 jsound examples/format_validation_producer.json examples/format_consumer_lenient.json
@@ -139,6 +191,12 @@ if not result.is_compatible:
 7. **Configuration Validation**: Required fields with type and range constraints
 8. **API Response Flexibility**: Using anyOf for multiple data types
 9. **Conditional Logic**: if/then/else constraints for conditional validation
+10. **Property Dependencies (`dependentRequired`)**: When one property exists, others become required
+11. **Schema Dependencies (`dependentSchemas`)**: When one property exists, object must satisfy additional schema
+12. **Legacy Dependencies**: Draft 7 `dependencies` supporting both property lists and schema objects
+13. **Authentication Dependencies**: API configuration requiring appropriate credentials for each auth type
+14. **Security Dependencies**: Database configuration requiring certificates when SSL is enabled
+15. **Payment Dependencies**: Payment forms requiring billing info when payment methods are specified
 
 ## Enhanced Explanation Features
 

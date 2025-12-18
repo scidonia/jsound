@@ -1,3 +1,16 @@
 {
-  "const": 42
+  "title": "Producer with Const 42", 
+  "description": "Producer schema with const constraint on number",
+  "type": "object",
+  "properties": {
+    "answer": {
+      "type": "number",
+      "const": 42
+    },
+    "mode": {
+      "type": "string", 
+      "const": "production"
+    }
+  },
+  "required": ["answer", "mode"]
 }

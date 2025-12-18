@@ -526,6 +526,16 @@ class JSoundAPI:
             explanation_parts,
         )
 
+        # Check const/enum violations
+        self._analyze_const_enum_failures(
+            producer,
+            consumer,
+            counterexample,
+            failed_constraints,
+            recommendations,
+            explanation_parts,
+        )
+
         # Check additionalProperties conflicts
         if consumer.get("additionalProperties") == False:
             consumer_props_set = set(consumer.get("properties", {}).keys())
@@ -726,6 +736,163 @@ class JSoundAPI:
                             recommendations.append(
                                 f"Ensure producer satisfies dependency schema when '{trigger_prop}' is present"
                             )
+
+    def _analyze_const_enum_failures(
+        self,
+        producer: Dict[str, Any],
+        consumer: Dict[str, Any],
+        counterexample: Any,
+        failed_constraints: list,
+        recommendations: list,
+        explanation_parts: list,
+    ) -> None:
+        """Analyze const and enum constraint violations."""
+
+        # Check top-level const/enum mismatches for primitive values
+        if not isinstance(counterexample, dict):
+            self._check_const_enum_violation(
+                producer,
+                consumer,
+                counterexample,
+                failed_constraints,
+                recommendations,
+                explanation_parts,
+            )
+            return
+            return
+
+        # Check top-level const/enum mismatches for objects
+        self._check_const_enum_violation(
+            producer,
+            consumer,
+            counterexample,
+            failed_constraints,
+            recommendations,
+            explanation_parts,
+        )
+
+        # Check property-level const/enum mismatches for objects
+        producer_props = producer.get("properties", {})
+        consumer_props = consumer.get("properties", {})
+
+        for prop_name, prop_value in counterexample.items():
+            if prop_name in consumer_props:
+                consumer_prop_schema = consumer_props[prop_name]
+                producer_prop_schema = producer_props.get(prop_name, {})
+
+                self._check_const_enum_violation(
+                    producer_prop_schema,
+                    consumer_prop_schema,
+                    prop_value,
+                    failed_constraints,
+                    recommendations,
+                    explanation_parts,
+                    property_name=prop_name,
+                )
+
+        # Check property-level const/enum mismatches for objects
+        if isinstance(counterexample, dict):
+            producer_props = producer.get("properties", {})
+            consumer_props = consumer.get("properties", {})
+
+            for prop_name, prop_value in counterexample.items():
+                if prop_name in consumer_props:
+                    consumer_prop_schema = consumer_props[prop_name]
+                    producer_prop_schema = producer_props.get(prop_name, {})
+
+                    self._check_const_enum_violation(
+                        producer_prop_schema,
+                        consumer_prop_schema,
+                        prop_value,
+                        failed_constraints,
+                        recommendations,
+                        explanation_parts,
+                        property_name=prop_name,
+                    )
+
+    def _check_const_enum_violation(
+        self,
+        producer: Dict[str, Any],
+        consumer: Dict[str, Any],
+        value: Any,
+        failed_constraints: list,
+        recommendations: list,
+        explanation_parts: list,
+        property_name: Optional[str] = None,
+    ) -> None:
+        """Check for const/enum constraint violations."""
+
+        prefix = f"Property '{property_name}' " if property_name else ""
+        context = property_name or "root"
+
+        # Consumer has const constraint
+        if "const" in consumer:
+            consumer_const = consumer["const"]
+
+            if "const" in producer:
+                producer_const = producer["const"]
+                if producer_const != consumer_const:
+                    explanation_parts.append(
+                        f"{prefix}const mismatch: producer requires '{producer_const}', consumer requires '{consumer_const}'"
+                    )
+                    failed_constraints.append(
+                        f"const:{context}:{producer_const}→{consumer_const}"
+                    )
+                    recommendations.append(
+                        f"Change {prefix.lower() if prefix else 'schema '}const from '{producer_const}' to '{consumer_const}'"
+                    )
+            elif "enum" in producer:
+                producer_enum = producer["enum"]
+                if consumer_const not in producer_enum:
+                    explanation_parts.append(
+                        f"{prefix}const/enum mismatch: producer enum {producer_enum} doesn't include consumer const '{consumer_const}'"
+                    )
+                    failed_constraints.append(f"const_enum_mismatch:{context}")
+                    recommendations.append(
+                        f"Add '{consumer_const}' to {prefix.lower() if prefix else 'schema '}enum or change to const"
+                    )
+            elif value != consumer_const:
+                explanation_parts.append(
+                    f"{prefix}violates const constraint: value '{value}' not allowed, consumer requires '{consumer_const}'"
+                )
+                failed_constraints.append(f"const_violation:{context}")
+                recommendations.append(
+                    f"Add {prefix.lower() if prefix else 'schema '}const constraint '{consumer_const}' to producer"
+                )
+
+        # Consumer has enum constraint
+        elif "enum" in consumer:
+            consumer_enum = consumer["enum"]
+
+            if "const" in producer:
+                producer_const = producer["const"]
+                if producer_const not in consumer_enum:
+                    explanation_parts.append(
+                        f"{prefix}const/enum mismatch: producer const '{producer_const}' not in consumer enum {consumer_enum}"
+                    )
+                    failed_constraints.append(f"const_enum_mismatch:{context}")
+                    recommendations.append(
+                        f"Change {prefix.lower() if prefix else 'schema '}const '{producer_const}' to one of {consumer_enum}"
+                    )
+            elif "enum" in producer:
+                producer_enum = producer["enum"]
+                invalid_values = [v for v in producer_enum if v not in consumer_enum]
+                if invalid_values:
+                    explanation_parts.append(
+                        f"{prefix}enum mismatch: producer allows {invalid_values} not in consumer enum {consumer_enum}"
+                    )
+                    failed_constraints.append(f"enum_mismatch:{context}")
+                    recommendations.append(
+                        f"Remove {invalid_values} from {prefix.lower() if prefix else 'schema '}enum or expand consumer enum"
+                    )
+            elif value not in consumer_enum:
+                explanation_parts.append(
+                    f"{prefix}violates enum constraint: value '{value}' not in allowed values {consumer_enum}"
+                )
+                failed_constraints.append(f"enum_violation:{context}")
+                recommendations.append(
+                    f"Add {prefix.lower() if prefix else 'schema '}enum constraint {consumer_enum} to producer"
+                )
 
     def _object_satisfies_schema(self, obj: dict, schema: Dict[str, Any]) -> bool:
         """Simple check if object satisfies schema constraints."""

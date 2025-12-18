@@ -1,0 +1,16 @@
+{
+  "title": "Consumer with Enum Constraint",
+  "description": "Consumer schema with enum constraint requiring specific values",
+  "type": "object",
+  "properties": {
+    "priority": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "status": {
+      "type": "string", 
+      "const": "enabled"
+    }
+  },
+  "required": ["priority", "status"]
+}

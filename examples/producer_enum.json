@@ -1,0 +1,16 @@
+{
+  "title": "Producer with Incompatible Enum",
+  "description": "Producer schema with enum that includes values not allowed by consumer",
+  "type": "object",
+  "properties": {
+    "priority": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical", "urgent"]
+    },
+    "status": {
+      "type": "string",
+      "const": "active"
+    }
+  },
+  "required": ["priority", "status"]
+}
