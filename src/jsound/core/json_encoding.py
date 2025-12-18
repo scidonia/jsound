@@ -16,7 +16,7 @@ class JSONEncoder:
     def create_json_datatype(self) -> DatatypeSort:
         """Create the Z3 JSON datatype following the specification exactly.
 
-        Per section 4.1 of json-schema-to-z3-spec.md:
+        Per section 4.1 of docs/json-schema-to-z3-spec.md:
         JSON =
           Null
         | Bool(b: Bool)

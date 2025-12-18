@@ -185,7 +185,7 @@ Recommendations: ["Remove ['critical', 'urgent'] from property 'priority' enum o
 
 ## 🔧 Architecture
 
-jSound implements the specification in `json-schema-to-z3-spec.md` with these key components:
+jSound implements the specification in `docs/json-schema-to-z3-spec.md` with these key components:
 
 ### Core Components
 
@@ -392,7 +392,7 @@ Default bounds can be adjusted via CLI options:
 
 ## 🎓 Theory
 
-jSound implements the **JSON Schema → SMT** translation specified in `json-schema-to-z3-spec.md`. Key theoretical foundations:
+jSound implements the **JSON Schema → SMT** translation specified in `docs/json-schema-to-z3-spec.md`. Key theoretical foundations:
 
 1. **Finite Model Property**: Uses bounded arrays and finite key universes to ensure decidability
 2. **Tagged Union Encoding**: JSON values encoded as Z3 algebraic datatypes
